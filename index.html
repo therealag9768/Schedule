@@ -63,6 +63,9 @@ textarea#notes{resize:none;overflow:hidden;min-height:100px}
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css">
 <script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
+<!-- Google APIs -->
+<script src="https://apis.google.com/js/api.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 <header>Schedule App</header>
@@ -74,8 +77,7 @@ textarea#notes{resize:none;overflow:hidden;min-height:100px}
   <div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;justify-content:center">
     <button id="uploadCSV">Upload CSV / XLS</button>
     <button id="downloadAirOne">Download Air One XLS</button>
-    <button id="copyCSV">Copy CSV to Clipboard</button>
-    <button id="openSheet">Open Master Sheet</button>
+    <button id="loadSheet">Load from Google Sheet</button>
     <button id="viewSpreadsheet">View All Jobs Spreadsheet</button>
   </div>
   <div id="jobTableContainer">
@@ -173,7 +175,158 @@ textarea#notes{resize:none;overflow:hidden;min-height:100px}
   </div>
 </div>
 <script>
-// === YOUR BASELINE CODE ===
+// === GOOGLE SHEETS AUTO-SYNC ===
+const SHEET_ID = '1HHigA2FLOc-R4s4nBKKmQb8cJo4hLdrVn5ACUA-HNjY';
+const CLIENT_ID = '1002184185824-06elg3bgd32qso2ckp7tpfbgeojri6r2.apps.googleusercontent.com';
+const DISCOVERY_DOC = 'https://sheets.googleapis.com/$discovery/rest?version=v4';
+const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
+
+let tokenClient;
+let gapiInited = false;
+let gisInited = false;
+
+function gapiLoad() {
+  gapi.load('client', async () => {
+    await gapi.client.init({
+      discoveryDocs: [DISCOVERY_DOC],
+    });
+    gapiInited = true;
+    maybeEnableSync();
+  });
+}
+
+function gisLoaded() {
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: () => {},
+  });
+  gisInited = true;
+  maybeEnableSync();
+}
+
+function maybeEnableSync() {
+  if (gapiInited && gisInited) {
+    document.getElementById('loadSheet').disabled = false;
+  }
+}
+
+// Load from Sheet
+async function loadSheetData() {
+  if (!gapi.client.getToken()) {
+    tokenClient.callback = async (resp) => {
+      if (resp.error) {
+        alert('Login error: ' + resp.error);
+        return;
+      }
+      await performLoad();
+    };
+    tokenClient.requestAccessToken({prompt: 'consent'});
+  } else {
+    await performLoad();
+  }
+}
+
+async function performLoad() {
+  try {
+    const response = await gapi.client.sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: 'A1:Z1000',
+    });
+    const rows = response.result.values || [];
+    if (rows.length === 0) {
+      alert('No data in sheet.');
+      return;
+    }
+    const headers = rows[0];
+    jobs.length = 0;
+    for (let i = 1; i < rows.length; i++) {
+      const r = {};
+      headers.forEach((h, idx) => r[h] = rows[i][idx] || '');
+      let rawDate = r['Start Date'] || '';
+      let parts = rawDate.split('/');
+      if (parts.length === 3) {
+        parts[0] = parseInt(parts[0], 10).toString();
+        parts[1] = parseInt(parts[1], 10).toString();
+        rawDate = parts.join('/');
+      }
+      jobs.push({
+        name: r['Name'] || '',
+        number: r['Job Number'] || '',
+        startDate: rawDate,
+        scheduledDate: r['Scheduled Date'] || rawDate,
+        status: r['Field Ops'] || 'TAB',
+        fieldOps: r['Field Ops'] || 'TAB',
+        location: r['Location'] || '',
+        customer: r['Customer'] || '',
+        hours: r['Field Hours'] || '',
+        clientProjectManager: r['Client Project Manager'] || '',
+        pmNumber: r['PM Number'] || '',
+        pmEmail: r['PM Email'] || '',
+        preConEmail: r['Pre Con Email'] || '',
+        tbeEmail: r['TBE Email'] || '',
+        notes: r['Notes'] || '',
+        statusWarning: false,
+        newJobFlag: false
+      });
+    }
+    renderAll();
+    alert('Loaded from Google Sheet!');
+  } catch (err) {
+    alert('Load error: ' + (err.result?.error?.message || err.message));
+  }
+}
+
+// Save to Sheet (called automatically on changes)
+async function saveToSheet() {
+  if (!gapi.client.getToken()) {
+    tokenClient.callback = async (resp) => {
+      if (resp.error) {
+        console.error('Save failed - login required');
+        return;
+      }
+      await performSave();
+    };
+    tokenClient.requestAccessToken({prompt: 'consent'});
+  } else {
+    await performSave();
+  }
+}
+
+async function performSave() {
+  try {
+    const headers = ['Name','Job Number','Field Ops','Field Hours','Start Date','Scheduled Date','Customer','Client Project Manager','PM Number','PM Email','Location','Pre Con Email','TBE Email','Notes'];
+    const data = jobs.map(j => [
+      j.name || '',
+      j.number || '',
+      j.fieldOps || '',
+      j.hours || '',
+      j.startDate || '',
+      j.scheduledDate || '',
+      j.customer || '',
+      j.clientProjectManager || '',
+      j.pmNumber || '',
+      j.pmEmail || '',
+      j.location || '',
+      j.preConEmail || '',
+      j.tbeEmail || '',
+      j.notes || ''
+    ]);
+    const values = [headers, ...data];
+
+    await gapi.client.sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: 'A1',
+      valueInputOption: 'RAW',
+      resource: { values }
+    });
+    console.log('Auto-saved to Sheet');
+  } catch (err) {
+    console.error('Save error:', err);
+  }
+}
+
+// === YOUR ORIGINAL BASELINE CODE (with auto-save hooks added) ===
 const jobs = [];
 let activeJob = null;
 let currentMonth = new Date().getMonth();
@@ -195,7 +348,6 @@ function statusClass(v) {
 function daysInMonth(month, year) {
   return new Date(year, month + 1, 0).getDate();
 }
-// Auto-grow notes
 function autoGrowNotes() {
   const notes = document.getElementById('notes');
   if (notes) {
@@ -203,7 +355,6 @@ function autoGrowNotes() {
     notes.style.height = notes.scrollHeight + 'px';
   }
 }
-// Calendar render - always visible
 function renderCalendar() {
   document.getElementById('currentMonthLabel').textContent = monthNames[currentMonth] + ' ' + currentYear;
   const cal = document.getElementById('calendar');
@@ -238,7 +389,6 @@ function renderCalendar() {
     cal.appendChild(day);
   }
 }
-// Drag & drop
 let draggedJob = null;
 function makeJobsDraggable() {
   document.querySelectorAll('.calendar-job').forEach(el => {
@@ -255,12 +405,12 @@ function makeJobsDraggable() {
       if (draggedJob) {
         draggedJob.scheduledDate = day.dataset.date;
         renderAll();
+        saveToSheet(); // Auto-save on drag
         draggedJob = null;
       }
     };
   });
 }
-// Manual add
 document.addEventListener('click', e => {
   if (e.target.classList.contains('calendar-day') && e.target.children.length === 1) {
     const selectedDate = e.target.dataset.date;
@@ -287,9 +437,9 @@ document.addEventListener('click', e => {
       newJobFlag: false
     });
     renderAll();
+    saveToSheet(); // Auto-save on add
   }
 });
-// Table render
 function renderList(filteredJobs) {
   const tbody = document.querySelector('#jobTable tbody');
   tbody.innerHTML = '';
@@ -303,7 +453,6 @@ function renderList(filteredJobs) {
     tbody.appendChild(tr);
   });
 }
-// Open job
 function openJob(j) {
   activeJob = j;
   document.getElementById('detailTitle').textContent = `${j.name||'Unnamed'} ${j.number||''}`;
@@ -321,14 +470,13 @@ function openJob(j) {
   autoGrowNotes();
   detailPane.classList.add('open');
 }
-// Auto-save notes
 document.getElementById('notes').addEventListener('input', () => {
   if (activeJob) {
     activeJob.notes = document.getElementById('notes').value;
     autoGrowNotes();
+    saveToSheet(); // Auto-save note
   }
 });
-// Edit pane
 function getUnique(field) {
   return [...new Set(jobs.map(j => j[field] || '').filter(v => v.trim()))].sort();
 }
@@ -366,9 +514,9 @@ function saveEditPane() {
   });
   editPane.classList.remove('open');
   renderAll();
+  saveToSheet(); // Auto-save on edit
   openJob(activeJob);
 }
-// File upload
 function triggerFileInput() {
   const i = document.createElement('input');
   i.type = 'file';
@@ -384,13 +532,13 @@ function triggerFileInput() {
         csv = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]]);
       }
       parseCSV(csv);
+      saveToSheet(); // Auto-save after upload
     };
     f.name.endsWith('.csv') ? r.readAsText(f) : r.readAsArrayBuffer(f);
   };
   i.click();
 }
 document.getElementById('uploadCSV').onclick = triggerFileInput;
-// Parse CSV
 function parseCSV(t) {
   const lines = t.split(/\r?\n/).filter(l => l.trim());
   if (!lines.length) return;
@@ -477,46 +625,8 @@ function parseCSV(t) {
   previousJobList = jobs.map(j => ({name: j.name, number: j.number}));
   sortJobs('fieldOps');
   renderAll();
+  saveToSheet(); // Auto-save after parse
 }
-// Export CSV to Clipboard
-function copyCSVToClipboard() {
-  if (jobs.length === 0) {
-    alert('No jobs to copy.');
-    return;
-  }
-  const headers = ['Name','Job Number','Field Ops','Field Hours','Start Date','Scheduled Date','Customer','Client Project Manager','PM Number','PM Email','Location','Pre Con Email','TBE Email','Notes'];
-  const rows = jobs.map(j => [
-    j.name,
-    j.number,
-    j.fieldOps,
-    j.hours,
-    j.startDate,
-    j.scheduledDate,
-    j.customer,
-    j.clientProjectManager,
-    j.pmNumber,
-    j.pmEmail,
-    j.location,
-    j.preConEmail,
-    j.tbeEmail,
-    j.notes
-  ]);
-  let csvContent = headers.join(',') + '\n' + rows.map(row => row.map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(',')).join('\n');
-  navigator.clipboard.writeText(csvContent).then(() => {
-    alert('CSV copied to clipboard! Paste into your Google Sheet.');
-  }).catch(() => {
-    alert('Copy failed - try the Export CSV button instead.');
-  });
-}
-document.getElementById('copyCSV').onclick = copyCSVToClipboard;
-
-// Open Master Sheet (replace with your actual Google Sheet URL)
-const MASTER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1HHigA2FLOc-R4s4nBKKmQb8cJo4hLdrVn5ACUA-HNjY/edit'; // <-- Replace with your Sheet's URL
-document.getElementById('openSheet').onclick = () => {
-  window.open(MASTER_SHEET_URL, '_blank');
-};
-
-// Download & modal
 document.getElementById('downloadAirOne').onclick = () => {
   window.open('https://airone.palmettoairbalance.com/project_management/projects/?_export=xls','_blank');
   document.getElementById('downloadModal').style.display = 'flex';
@@ -525,7 +635,6 @@ document.getElementById('triggerUpload').onclick = () => {
   triggerFileInput();
   document.getElementById('downloadModal').style.display = 'none';
 };
-// Swipe close
 let touchStartX = 0;
 detailPane.addEventListener('touchstart', e => touchStartX = e.touches[0].clientX);
 detailPane.addEventListener('touchmove', e => { if (e.touches[0].clientX - touchStartX > 100) detailPane.classList.remove('open'); });
@@ -615,7 +724,6 @@ Thank you,`;
     alert('No Client PM email available for this job. Please enter it in the spreadsheet view.');
   }
 };
-// Event listeners
 document.getElementById('prevMonth').onclick = () => { currentMonth--; if (currentMonth < 0) { currentMonth = 11; currentYear--; } renderAll(); };
 document.getElementById('nextMonth').onclick = () => { currentMonth++; if (currentMonth > 11) { currentMonth = 0; currentYear++; } renderAll(); };
 document.getElementById('backBtn').onclick = () => detailPane.classList.remove('open');
@@ -641,14 +749,12 @@ function sortJobs(field) {
     return 0;
   });
 }
-// Render everything
 function renderAll() {
   renderCalendar();
   renderList();
   makeJobsDraggable();
   if (window.hot) updateSpreadsheetData();
 }
-// Spreadsheet code
 let hot = null;
 function getAllKeys() {
   if (jobs.length === 0) return [];
@@ -694,6 +800,7 @@ function initSpreadsheet() {
         if (actualJobIndex !== -1) jobs[actualJobIndex][key] = newVal;
       });
       renderAll();
+      saveToSheet(); // Auto-save on spreadsheet edit
     }
   });
 }
@@ -730,6 +837,7 @@ document.getElementById('addRow').onclick = () => {
   jobs.push(newJob);
   updateSpreadsheetData();
   renderAll();
+  saveToSheet(); // Auto-save
 };
 document.getElementById('addColumn').onclick = () => {
   const colName = prompt('Enter new column name:');
@@ -738,8 +846,13 @@ document.getElementById('addColumn').onclick = () => {
   jobs.forEach(job => { if (!(cleanName in job)) job[cleanName] = ''; });
   updateSpreadsheetData();
   alert(`Column "${cleanName}" added to all jobs!`);
+  saveToSheet(); // Auto-save
 };
 document.getElementById('spreadsheetSearch').addEventListener('input', () => updateSpreadsheetData());
+
+// Initialize Google APIs
+gapiLoad();
+gisLoaded();
 
 // Always render calendar on load
 renderAll();
