@@ -177,6 +177,7 @@ textarea#notes{resize:none;overflow:hidden;min-height:100px}
 <script>
 // === GOOGLE SHEETS AUTO-SYNC ===
 const SHEET_ID = '1HHigA2FLOc-R4s4nBKKmQb8cJo4hLdrVn5ACUA-HNjY';
+const API_KEY = 'AIzaSyAOMHM9t9e1VSLWJRMF683lwgu_4vmr65g';
 const CLIENT_ID = '1002184185824-06elg3bgd32qso2ckp7tpfbgeojri6r2.apps.googleusercontent.com';
 const DISCOVERY_DOC = 'https://sheets.googleapis.com/$discovery/rest?version=v4';
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
@@ -187,11 +188,18 @@ let gisInited = false;
 
 function gapiLoad() {
   gapi.load('client', async () => {
-    await gapi.client.init({
-      discoveryDocs: [DISCOVERY_DOC],
-    });
-    gapiInited = true;
-    maybeEnableSync();
+    try {
+      await gapi.client.init({
+        apiKey: API_KEY,
+        discoveryDocs: [DISCOVERY_DOC],
+      });
+      console.log('GAPI client initialized');
+      gapiInited = true;
+      maybeEnableSync();
+    } catch (err) {
+      console.error('GAPI init error:', err);
+      alert('Google API failed to initialize. Check console (F12).');
+    }
   });
 }
 
@@ -203,39 +211,48 @@ function gisLoaded() {
   });
   gisInited = true;
   maybeEnableSync();
+  console.log('GIS loaded');
 }
 
 function maybeEnableSync() {
   if (gapiInited && gisInited) {
+    console.log('Sync ready');
     document.getElementById('loadSheet').disabled = false;
   }
 }
 
-// Load from Sheet
+// Load from Sheet (with forced popup first time)
 async function loadSheetData() {
+  console.log('Load button clicked');
   if (!gapi.client.getToken()) {
+    console.log('No token - requesting access');
     tokenClient.callback = async (resp) => {
       if (resp.error) {
-        alert('Login error: ' + resp.error);
+        console.error('Token error:', resp.error);
+        alert('Login failed: ' + resp.error);
         return;
       }
+      console.log('Token granted');
       await performLoad();
     };
     tokenClient.requestAccessToken({prompt: 'consent'});
   } else {
+    console.log('Token already present');
     await performLoad();
   }
 }
 
 async function performLoad() {
   try {
+    console.log('Performing load...');
     const response = await gapi.client.sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
       range: 'A1:Z1000',
     });
     const rows = response.result.values || [];
+    console.log('Rows fetched:', rows.length);
     if (rows.length === 0) {
-      alert('No data in sheet.');
+      alert('No data found in sheet.');
       return;
     }
     const headers = rows[0];
@@ -271,29 +288,19 @@ async function performLoad() {
       });
     }
     renderAll();
-    alert('Loaded from Google Sheet!');
+    alert(`Loaded ${jobs.length} jobs from Google Sheet!`);
   } catch (err) {
-    alert('Load error: ' + (err.result?.error?.message || err.message));
+    console.error('Load error:', err);
+    alert('Load failed: ' + (err.result?.error?.message || 'Check console (F12)'));
   }
 }
 
-// Save to Sheet (called automatically on changes)
+// Auto-save on changes
 async function saveToSheet() {
   if (!gapi.client.getToken()) {
-    tokenClient.callback = async (resp) => {
-      if (resp.error) {
-        console.error('Save failed - login required');
-        return;
-      }
-      await performSave();
-    };
-    tokenClient.requestAccessToken({prompt: 'consent'});
-  } else {
-    await performSave();
+    console.log('No token for save - skipping');
+    return;
   }
-}
-
-async function performSave() {
   try {
     const headers = ['Name','Job Number','Field Ops','Field Hours','Start Date','Scheduled Date','Customer','Client Project Manager','PM Number','PM Email','Location','Pre Con Email','TBE Email','Notes'];
     const data = jobs.map(j => [
@@ -326,7 +333,7 @@ async function performSave() {
   }
 }
 
-// === YOUR ORIGINAL BASELINE CODE (with auto-save hooks added) ===
+// === BASELINE CODE ===
 const jobs = [];
 let activeJob = null;
 let currentMonth = new Date().getMonth();
@@ -335,7 +342,7 @@ const monthNames = ['January','February','March','April','May','June','July','Au
 const sortDirection = {};
 let previousJobList = [];
 
-// Utility functions
+// Utility functions (unchanged)
 function statusClass(v) {
   v = (v || 'TAB').toLowerCase();
   if (v === 'complete') return 'status-blue';
@@ -405,7 +412,7 @@ function makeJobsDraggable() {
       if (draggedJob) {
         draggedJob.scheduledDate = day.dataset.date;
         renderAll();
-        saveToSheet(); // Auto-save on drag
+        saveToSheet(); // Auto-save
         draggedJob = null;
       }
     };
@@ -437,7 +444,7 @@ document.addEventListener('click', e => {
       newJobFlag: false
     });
     renderAll();
-    saveToSheet(); // Auto-save on add
+    saveToSheet(); // Auto-save
   }
 });
 function renderList(filteredJobs) {
@@ -474,7 +481,7 @@ document.getElementById('notes').addEventListener('input', () => {
   if (activeJob) {
     activeJob.notes = document.getElementById('notes').value;
     autoGrowNotes();
-    saveToSheet(); // Auto-save note
+    saveToSheet(); // Auto-save
   }
 });
 function getUnique(field) {
@@ -514,7 +521,7 @@ function saveEditPane() {
   });
   editPane.classList.remove('open');
   renderAll();
-  saveToSheet(); // Auto-save on edit
+  saveToSheet(); // Auto-save
   openJob(activeJob);
 }
 function triggerFileInput() {
@@ -532,7 +539,7 @@ function triggerFileInput() {
         csv = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]]);
       }
       parseCSV(csv);
-      saveToSheet(); // Auto-save after upload
+      saveToSheet(); // Auto-save
     };
     f.name.endsWith('.csv') ? r.readAsText(f) : r.readAsArrayBuffer(f);
   };
@@ -625,7 +632,7 @@ function parseCSV(t) {
   previousJobList = jobs.map(j => ({name: j.name, number: j.number}));
   sortJobs('fieldOps');
   renderAll();
-  saveToSheet(); // Auto-save after parse
+  saveToSheet(); // Auto-save
 }
 document.getElementById('downloadAirOne').onclick = () => {
   window.open('https://airone.palmettoairbalance.com/project_management/projects/?_export=xls','_blank');
@@ -800,7 +807,7 @@ function initSpreadsheet() {
         if (actualJobIndex !== -1) jobs[actualJobIndex][key] = newVal;
       });
       renderAll();
-      saveToSheet(); // Auto-save on spreadsheet edit
+      saveToSheet(); // Auto-save
     }
   });
 }
@@ -854,8 +861,9 @@ document.getElementById('spreadsheetSearch').addEventListener('input', () => upd
 gapiLoad();
 gisLoaded();
 
-// Always render calendar on load
+// Force initial render (calendar always visible)
 renderAll();
+console.log('App initialized - calendar should be visible');
 </script>
 </body>
 </html>
