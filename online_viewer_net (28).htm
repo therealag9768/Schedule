@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Schedule App</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<style>
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#F7F7F7}
+header{padding:14px;background:#1e88e5;color:#fff;font-size:24px;font-weight:600;text-align:center}
+#app{padding:12px;display:flex;flex-direction:column;align-items:center}
+#monthNav{display:flex;justify-content:space-between;align-items:center;width:90%;max-width:400px;margin-bottom:6px}
+#monthNav button{padding:6px 12px;font-size:16px;border:none;border-radius:6px;background:#1e88e5;color:#fff;cursor:pointer}
+#monthNav span{font-size:20px;font-weight:600}
+#weekdayHeader{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:6px;font-size:18px;font-weight:600;color:#555;width:90%}
+#weekdayHeader div{text-align:center}
+#calendarContainer{width:100%;max-width:1075px;overflow-x:auto;margin-bottom:12px}
+#calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;width:100%;padding:0;box-sizing:border-box}
+.calendar-day{background:#fff;border-radius:14px;padding:6px;display:flex;flex-direction:column;aspect-ratio:3/4;min-height:0;overflow:hidden;position:relative}
+.calendar-date{font-size:20px;font-weight:600;color:#444;margin-bottom:4px}
+.calendar-job{padding:4px 6px;border-radius:10px;font-size:22px;color:#fff;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;max-height:26px;line-height:26px}
+.calendar-more{font-size:14px;color:#666;margin-top:auto}
+#jobTableContainer{width:100%;max-width:1075px;overflow-x:auto;margin-bottom:12px}
+#jobTable{width:100%;border-collapse:collapse}
+#jobTable th, #jobTable td{padding:8px;border:1px solid #ccc;text-align:left;font-size:22px}
+#jobTable th{cursor:pointer;background:#eee}
+.status-blue{background:#2196f3;color:#fff}
+.status-green{background:#00d27f;color:#fff}
+.status-yellow{background:#fbc02d;color:#000}
+.status-red{background:#ff5252;color:#fff}
+.status-standby{background:#d3d3d3;color:#000}
+#detailPane{position:fixed;top:0;right:-100%;width:100%;height:100%;background:#fff;z-index:50;transition:.25s ease;overflow-y:auto;touch-action:none;display:flex;flex-direction:column}
+@media(min-width:900px){#detailPane{width:50%;right:-50%;}}
+#detailPane.open{right:0}
+#detailHeader{padding:16px;background:#1e88e5;color:#fff;font-size:18px;font-weight:600;display:flex;align-items:center;position:relative}
+#backBtn{font-size:22px;margin-right:12px;cursor:pointer}
+#detailTitle{flex:1}
+#editBtn{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:24px;cursor:pointer;color:#fff}
+.section{padding:16px;border-bottom:1px solid #eee}
+.row{display:flex;justify-content:space-between;margin-bottom:10px;font-size:16px}
+select,textarea,input[type="text"]{width:100%;padding:12px;border-radius:12px;border:1px solid #ccc;font-size:16px;box-sizing:border-box;margin-top:6px}
+textarea#notes{resize:none;overflow:hidden;min-height:100px}
+.btnGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.btnGrid button{padding:14px;border:none;border-radius:14px;background:#1e88e5;color:#fff;font-size:16px;cursor:pointer}
+.contactSection{text-align:center;}
+.contactButtons{display:flex;gap:8px;justify-content:center;margin-top:8px;}
+#jobSearch{margin:12px 0;padding:8px 12px;font-size:18px;border-radius:8px;border:1px solid #ccc;width:100%;max-width:1075px;box-sizing:border-box}
+/* Spreadsheet View Styles */
+#spreadsheetView{display:none;flex-direction:column;align-items:center;width:100%;padding:12px;box-sizing:border-box}
+#spreadsheetView.active{display:flex}
+#spreadsheetContainer{width:100%;max-width:1075px;height:70vh;border:1px solid #ccc;border-radius:8px;overflow:hidden;background:#fff}
+#spreadsheetControls{display:flex;gap:12px;margin:12px 0;flex-wrap:wrap;justify-content:center;align-items:center}
+#spreadsheetControls button{padding:10px 16px;border:none;border-radius:8px;background:#1e88e5;color:#fff;font-size:16px;cursor:pointer}
+#spreadsheetSearch{margin-bottom:12px;padding:8px 12px;font-size:18px;border-radius:8px;border:1px solid #ccc;width:100%;max-width:1075px;box-sizing:border-box}
+/* Edit Pane */
+#editPane{position:fixed;top:0;right:-100%;width:100%;height:100%;background:#fff;z-index:60;transition:.25s ease;overflow-y:auto;display:flex;flex-direction:column}
+@media(min-width:900px){#editPane{width:50%;right:-50%;}}
+#editPane.open{right:0}
+#editHeader{padding:16px;background:#1e88e5;color:#fff;font-size:18px;font-weight:600;display:flex;align-items:center}
+#editBackBtn{font-size:22px;margin-right:12px;cursor:pointer}
+#editTitle{flex:1}
+#saveEditBtn{padding:14px;border:none;border-radius:14px;background:#4caf50;color:#fff;font-size:16px;cursor:pointer;margin:20px auto;display:block;width:90%;max-width:400px}
+</style>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css">
+<script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
+</head>
+<body>
+<header>Schedule App</header>
+<div id="app">
+  <div id="monthNav"><button id="prevMonth">‹</button><span id="currentMonthLabel"></span><button id="nextMonth">›</button></div>
+  <div id="weekdayHeader"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
+  <div id="calendarContainer"><div id="calendar"></div></div>
+  <input type="text" id="jobSearch" placeholder="Search jobs by name, number, or customer...">
+  <div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;justify-content:center">
+    <button id="uploadCSV">Upload CSV / XLS</button>
+    <button id="downloadAirOne">Download Air One XLS</button>
+    <button id="copyCSV">Copy CSV to Clipboard</button>
+    <button id="openSheet">Open Master Sheet</button>
+    <button id="viewSpreadsheet">View All Jobs Spreadsheet</button>
+  </div>
+  <div id="jobTableContainer">
+    <table id="jobTable">
+      <thead>
+        <tr>
+          <th data-field="name">Name</th>
+          <th data-field="number">Job Number</th>
+          <th data-field="fieldOps">Field Ops</th>
+          <th data-field="startDate">Start Date</th>
+          <th data-field="hours">Field Hours</th>
+          <th data-field="customer">Customer</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+<!-- Spreadsheet View -->
+<div id="spreadsheetView">
+  <input type="text" id="spreadsheetSearch" placeholder="Search all jobs in spreadsheet (any field)...">
+  <div id="spreadsheetControls">
+    <button id="backToMain">← Back to Calendar</button>
+    <button id="addRow">Add New Row</button>
+    <button id="addColumn">Add New Column</button>
+  </div>
+  <div id="spreadsheetContainer"></div>
+</div>
+<!-- Detail Pane -->
+<div id="detailPane">
+  <div id="detailHeader">
+    <span id="backBtn">←</span>
+    <span id="detailTitle"></span>
+    <span id="editBtn">✎</span>
+  </div>
+  <div class="section" id="detailInfo"></div>
+  <div class="section contactSection">
+    <div style="margin-bottom:8px;font-weight:600">Contact Client PM:</div>
+    <div class="contactButtons">
+      <button id="callPM">Call</button>
+      <button id="emailPM">Email</button>
+      <button id="textPM">Text</button>
+    </div>
+  </div>
+  <div class="section">
+    <div class="btnGrid">
+      <button id="copyJob">Job Number</button>
+      <button id="openAir">Open Air One</button>
+      <button id="reportReady">Report Ready</button>
+      <button id="jobLocation">Job Location</button>
+      <button id="startEmail">Start Date Email</button>
+      <button id="airOneSchedule">Air One Schedule</button>
+    </div>
+  </div>
+  <div class="section">
+    <label>Notes:</label>
+    <textarea id="notes" placeholder="Notes"></textarea>
+  </div>
+</div>
+<!-- Edit Pane -->
+<div id="editPane">
+  <div id="editHeader">
+    <span id="editBackBtn">←</span>
+    <span id="editTitle">Edit Job</span>
+  </div>
+  <div class="section">
+    <label>Location</label>
+    <select id="editLocation"></select>
+    <input type="text" id="newLocation" placeholder="Or enter new location">
+    <label>Customer</label>
+    <select id="editCustomer"></select>
+    <input type="text" id="newCustomer" placeholder="Or enter new customer">
+    <label>Client Project Manager</label>
+    <select id="editClientProjectManager"></select>
+    <input type="text" id="newClientProjectManager" placeholder="Or enter new PM name">
+    <label>PM Email</label>
+    <select id="editPmEmail"></select>
+    <input type="text" id="newPmEmail" placeholder="Or enter new PM email">
+    <label>PM Number</label>
+    <select id="editPmNumber"></select>
+    <input type="text" id="newPmNumber" placeholder="Or enter new PM number">
+    <label>Pre Con Email</label>
+    <select id="editPreConEmail"></select>
+    <input type="text" id="newPreConEmail" placeholder="Or enter new Pre Con email">
+    <label>TBE Email</label>
+    <select id="editTbeEmail"></select>
+    <input type="text" id="newTbeEmail" placeholder="Or enter new TBE email">
+  </div>
+  <button id="saveEditBtn">Save Changes</button>
+</div>
+<div id="downloadModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;z-index:100">
+  <div style="background:#fff;padding:24px;border-radius:12px;display:flex;flex-direction:column;align-items:center;gap:12px">
+    <div>Air One XLS downloaded.</div>
+    <button id="triggerUpload">Upload File</button>
+  </div>
+</div>
+<script>
+// === YOUR BASELINE CODE ===
+const jobs = [];
+let activeJob = null;
+let currentMonth = new Date().getMonth();
+let currentYear = new Date().getFullYear();
+const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const sortDirection = {};
+let previousJobList = [];
+
+// Utility functions
+function statusClass(v) {
+  v = (v || 'TAB').toLowerCase();
+  if (v === 'complete') return 'status-blue';
+  if (v === 'field ready') return 'status-green';
+  if (v === 'tab') return 'status-yellow';
+  if (v === 'stalled') return 'status-red';
+  if (v === 'standby') return 'status-standby';
+  return 'status-yellow';
+}
+function daysInMonth(month, year) {
+  return new Date(year, month + 1, 0).getDate();
+}
+// Auto-grow notes
+function autoGrowNotes() {
+  const notes = document.getElementById('notes');
+  if (notes) {
+    notes.style.height = 'auto';
+    notes.style.height = notes.scrollHeight + 'px';
+  }
+}
+// Calendar render - always visible
+function renderCalendar() {
+  document.getElementById('currentMonthLabel').textContent = monthNames[currentMonth] + ' ' + currentYear;
+  const cal = document.getElementById('calendar');
+  cal.innerHTML = '';
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const days = daysInMonth(currentMonth, currentYear);
+  for (let i = 0; i < firstDay; i++) {
+    const empty = document.createElement('div');
+    empty.className = 'calendar-day';
+    cal.appendChild(empty);
+  }
+  for (let i = 1; i <= days; i++) {
+    const day = document.createElement('div');
+    day.className = 'calendar-day';
+    const dateStr = `${currentMonth + 1}/${i}/${currentYear}`;
+    day.dataset.date = dateStr;
+    day.innerHTML = `<div class="calendar-date">${i}</div>`;
+    const dayJobs = jobs.filter(j => j.scheduledDate === dateStr);
+    dayJobs.slice(0,4).forEach(j => {
+      const el = document.createElement('div');
+      el.className = 'calendar-job ' + statusClass(j.status || j.fieldOps);
+      el.textContent = j.name || 'Unnamed';
+      el.onclick = () => openJob(j);
+      day.appendChild(el);
+    });
+    if (dayJobs.length > 4) {
+      const more = document.createElement('div');
+      more.className = 'calendar-more';
+      more.textContent = `+${dayJobs.length - 4} more`;
+      day.appendChild(more);
+    }
+    cal.appendChild(day);
+  }
+}
+// Drag & drop
+let draggedJob = null;
+function makeJobsDraggable() {
+  document.querySelectorAll('.calendar-job').forEach(el => {
+    el.draggable = true;
+    el.ondragstart = e => {
+      draggedJob = jobs.find(j => j.name === el.textContent && j.scheduledDate === el.parentElement.dataset.date);
+      e.dataTransfer.effectAllowed = 'move';
+    };
+  });
+  document.querySelectorAll('.calendar-day').forEach(day => {
+    day.ondragover = e => e.preventDefault();
+    day.ondrop = e => {
+      e.preventDefault();
+      if (draggedJob) {
+        draggedJob.scheduledDate = day.dataset.date;
+        renderAll();
+        draggedJob = null;
+      }
+    };
+  });
+}
+// Manual add
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('calendar-day') && e.target.children.length === 1) {
+    const selectedDate = e.target.dataset.date;
+    const jobName = prompt('Enter Job Name:');
+    if (!jobName) return;
+    const jobNumber = prompt('Enter Job Number:') || '';
+    const customer = prompt('Enter Customer:') || '';
+    jobs.push({
+      name: jobName,
+      number: jobNumber,
+      startDate: selectedDate,
+      scheduledDate: selectedDate,
+      status: 'TAB',
+      fieldOps: 'TAB',
+      location: '',
+      customer: customer,
+      clientProjectManager: '',
+      pmNumber: '',
+      pmEmail: '',
+      preConEmail: '',
+      tbeEmail: '',
+      notes: '',
+      statusWarning: false,
+      newJobFlag: false
+    });
+    renderAll();
+  }
+});
+// Table render
+function renderList(filteredJobs) {
+  const tbody = document.querySelector('#jobTable tbody');
+  tbody.innerHTML = '';
+  const listToRender = filteredJobs || jobs;
+  listToRender.forEach(j => {
+    const warningIcon = j.statusWarning ? '⚠️ ' : (j.newJobFlag ? '🔴 ' : '');
+    const tr = document.createElement('tr');
+    tr.className = statusClass(j.status || j.fieldOps);
+    tr.innerHTML = `<td>${warningIcon}${j.name||''}</td><td>${j.number||''}</td><td>${j.fieldOps||''}</td><td>${j.startDate||''}</td><td>${j.hours||''}</td><td>${j.customer||''}</td>`;
+    tr.onclick = () => openJob(j);
+    tbody.appendChild(tr);
+  });
+}
+// Open job
+function openJob(j) {
+  activeJob = j;
+  document.getElementById('detailTitle').textContent = `${j.name||'Unnamed'} ${j.number||''}`;
+  const info = document.getElementById('detailInfo');
+  info.innerHTML = `<div class="row"><span>Location</span><span>${j.location||''}</span></div>
+                   <div class="row"><span>Field Hours</span><span>${j.hours||''}</span></div>
+                   <div class="row"><span>Official Start Date</span><span>${j.startDate||''}</span></div>
+                   <div class="row"><span>Scheduled Date</span><span>${j.scheduledDate||j.startDate||''}</span></div>
+                   <div class="row"><span>Customer</span><span>${j.customer||''}</span></div>
+                   <div class="row"><span>Client Project Manager</span><span>${j.clientProjectManager||'N/A'}</span></div>
+                   <div class="row"><span>PM Number</span><span>${j.pmNumber||'N/A'}</span></div>
+                   <div class="row"><span>PM Email</span><span>${j.pmEmail||'N/A'}</span></div>`;
+  const notes = document.getElementById('notes');
+  notes.value = j.notes || '';
+  autoGrowNotes();
+  detailPane.classList.add('open');
+}
+// Auto-save notes
+document.getElementById('notes').addEventListener('input', () => {
+  if (activeJob) {
+    activeJob.notes = document.getElementById('notes').value;
+    autoGrowNotes();
+  }
+});
+// Edit pane
+function getUnique(field) {
+  return [...new Set(jobs.map(j => j[field] || '').filter(v => v.trim()))].sort();
+}
+function populateSelect(id, field) {
+  const select = document.getElementById(id);
+  select.innerHTML = '<option value="">-- Select --</option>';
+  getUnique(field).forEach(val => {
+    const opt = document.createElement('option');
+    opt.value = val;
+    opt.textContent = val;
+    select.appendChild(opt);
+  });
+}
+function openEditPane() {
+  if (!activeJob) return;
+  document.getElementById('editTitle').textContent = `Edit: ${activeJob.name || 'Job'}`;
+  const fields = ['location', 'customer', 'clientProjectManager', 'pmEmail', 'pmNumber', 'preConEmail', 'tbeEmail'];
+  fields.forEach(field => {
+    const selectId = 'edit' + field.charAt(0).toUpperCase() + field.slice(1);
+    const inputId = 'new' + field.charAt(0).toUpperCase() + field.slice(1);
+    populateSelect(selectId, field);
+    document.getElementById(selectId).value = activeJob[field] || '';
+    document.getElementById(inputId).value = '';
+  });
+  editPane.classList.add('open');
+}
+function saveEditPane() {
+  if (!activeJob) return;
+  const fields = ['location', 'customer', 'clientProjectManager', 'pmEmail', 'pmNumber', 'preConEmail', 'tbeEmail'];
+  fields.forEach(field => {
+    const selectId = 'edit' + field.charAt(0).toUpperCase() + field.slice(1);
+    const inputId = 'new' + field.charAt(0).toUpperCase() + field.slice(1);
+    const value = document.getElementById(inputId).value.trim() || document.getElementById(selectId).value;
+    if (value) activeJob[field] = value;
+  });
+  editPane.classList.remove('open');
+  renderAll();
+  openJob(activeJob);
+}
+// File upload
+function triggerFileInput() {
+  const i = document.createElement('input');
+  i.type = 'file';
+  i.accept = '.csv,.xls,.xlsx';
+  i.onchange = e => {
+    const f = e.target.files[0];
+    const r = new FileReader();
+    r.onload = ev => {
+      let csv;
+      if (f.name.endsWith('.csv')) csv = ev.target.result;
+      else {
+        const wb = XLSX.read(ev.target.result, {type: 'array'});
+        csv = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]]);
+      }
+      parseCSV(csv);
+    };
+    f.name.endsWith('.csv') ? r.readAsText(f) : r.readAsArrayBuffer(f);
+  };
+  i.click();
+}
+document.getElementById('uploadCSV').onclick = triggerFileInput;
+// Parse CSV
+function parseCSV(t) {
+  const lines = t.split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return;
+  const headerLine = lines.shift();
+  const headers = [];
+  let currentHeader = '';
+  let inQuote = false;
+  for (let char of headerLine + ',') {
+    if (inQuote) {
+      currentHeader += char;
+      if (char === '"') inQuote = false;
+    } else {
+      if (char === '"') {
+        inQuote = true;
+        currentHeader += char;
+      } else if (char === ',') {
+        headers.push(currentHeader.trim().replace(/^"|"$/g, ''));
+        currentHeader = '';
+      } else {
+        currentHeader += char;
+      }
+    }
+  }
+
+  lines.forEach(l => {
+    const values = [];
+    let currentValue = '';
+    let inQuote = false;
+    for (let char of l + ',') {
+      if (inQuote) {
+        currentValue += char;
+        if (char === '"') inQuote = false;
+      } else {
+        if (char === '"') {
+          inQuote = true;
+          currentValue += char;
+        } else if (char === ',') {
+          values.push(currentValue.trim().replace(/^"|"$/g, ''));
+          currentValue = '';
+        } else {
+          currentValue += char;
+        }
+      }
+    }
+
+    const r = {};
+    headers.forEach((h, i) => r[h] = values[i] || '');
+
+    let existing = jobs.find(j => j.name === r['Name'] && j.number === r['Job Number']);
+    if (existing) {
+      if ((existing.status || '') !== r['Field Ops']) {
+        existing.statusWarning = true;
+      }
+      return;
+    }
+    let rawDate = r['Start Date'] || '';
+    let parts = rawDate.split('/');
+    if (parts.length === 3) {
+      parts[0] = parseInt(parts[0], 10).toString();
+      parts[1] = parseInt(parts[1], 10).toString();
+      rawDate = parts.join('/');
+    }
+    const newJob = {
+      name: r['Name'] || '',
+      number: r['Job Number'] || '',
+      startDate: rawDate,
+      scheduledDate: rawDate,
+      status: r['Field Ops'] || 'TAB',
+      fieldOps: r['Field Ops'] || 'TAB',
+      location: r['Location'] || '',
+      customer: r['Customer'] || '',
+      hours: r['Field Hours'] || '',
+      clientProjectManager: r['Client Project Manager'] || '',
+      pmNumber: r['PM Number'] || '',
+      pmEmail: r['PM Email'] || '',
+      preConEmail: r['Pre Con Email'] || '',
+      tbeEmail: r['TBE Email'] || '',
+      notes: '',
+      statusWarning: false,
+      newJobFlag: previousJobList.length > 0 ? true : false
+    };
+    jobs.push(newJob);
+  });
+  previousJobList = jobs.map(j => ({name: j.name, number: j.number}));
+  sortJobs('fieldOps');
+  renderAll();
+}
+// Export CSV to Clipboard
+function copyCSVToClipboard() {
+  if (jobs.length === 0) {
+    alert('No jobs to copy.');
+    return;
+  }
+  const headers = ['Name','Job Number','Field Ops','Field Hours','Start Date','Scheduled Date','Customer','Client Project Manager','PM Number','PM Email','Location','Pre Con Email','TBE Email','Notes'];
+  const rows = jobs.map(j => [
+    j.name,
+    j.number,
+    j.fieldOps,
+    j.hours,
+    j.startDate,
+    j.scheduledDate,
+    j.customer,
+    j.clientProjectManager,
+    j.pmNumber,
+    j.pmEmail,
+    j.location,
+    j.preConEmail,
+    j.tbeEmail,
+    j.notes
+  ]);
+  let csvContent = headers.join(',') + '\n' + rows.map(row => row.map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(',')).join('\n');
+  navigator.clipboard.writeText(csvContent).then(() => {
+    alert('CSV copied to clipboard! Paste into your Google Sheet.');
+  }).catch(() => {
+    alert('Copy failed - try the Export CSV button instead.');
+  });
+}
+document.getElementById('copyCSV').onclick = copyCSVToClipboard;
+
+// Open Master Sheet (replace with your actual Google Sheet URL)
+const MASTER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1HHigA2FLOc-R4s4nBKKmQb8cJo4hLdrVn5ACUA-HNjY/edit'; // <-- Replace with your Sheet's URL
+document.getElementById('openSheet').onclick = () => {
+  window.open(MASTER_SHEET_URL, '_blank');
+};
+
+// Download & modal
+document.getElementById('downloadAirOne').onclick = () => {
+  window.open('https://airone.palmettoairbalance.com/project_management/projects/?_export=xls','_blank');
+  document.getElementById('downloadModal').style.display = 'flex';
+};
+document.getElementById('triggerUpload').onclick = () => {
+  triggerFileInput();
+  document.getElementById('downloadModal').style.display = 'none';
+};
+// Swipe close
+let touchStartX = 0;
+detailPane.addEventListener('touchstart', e => touchStartX = e.touches[0].clientX);
+detailPane.addEventListener('touchmove', e => { if (e.touches[0].clientX - touchStartX > 100) detailPane.classList.remove('open'); });
+editPane.addEventListener('touchstart', e => touchStartX = e.touches[0].clientX);
+editPane.addEventListener('touchmove', e => { if (e.touches[0].clientX - touchStartX > 100) editPane.classList.remove('open'); });
+// Contact buttons
+document.getElementById('callPM').onclick = () => {
+  if (activeJob && activeJob.pmNumber) {
+    window.location.href = `tel:${activeJob.pmNumber.replace(/[^\d+]/g, '')}`;
+  } else {
+    alert('No PM phone number available.');
+  }
+};
+document.getElementById('emailPM').onclick = () => {
+  if (activeJob && activeJob.pmEmail) {
+    window.location.href = `mailto:${activeJob.pmEmail}`;
+  } else {
+    alert('No PM email available.');
+  }
+};
+document.getElementById('textPM').onclick = () => {
+  if (activeJob && activeJob.pmNumber) {
+    window.location.href = `sms:${activeJob.pmNumber.replace(/[^\d+]/g, '')}`;
+  } else {
+    alert('No PM phone number available for texting.');
+  }
+};
+document.getElementById('copyJob').onclick = () => {
+  if (activeJob && activeJob.number) {
+    navigator.clipboard.writeText(activeJob.number).then(() => alert(`Job number ${activeJob.number} copied!`)).catch(() => alert('Copy failed'));
+  }
+};
+document.getElementById('openAir').onclick = () => window.open('https://airone.palmettoairbalance.com/project_management/projects/','_self');
+document.getElementById('airOneSchedule').onclick = () => window.open('https://airone.palmettoairbalance.com/scheduling/tech/','_self');
+document.getElementById('jobLocation').onclick = () => {
+  if (activeJob) {
+    const loc = activeJob.location || '';
+    if (loc) navigator.clipboard.writeText(loc).catch(() => {});
+    const mapsUrl = loc ? `https://www.google.com/maps/dir///${encodeURIComponent(loc)}/@35.5736863,-78.5547264,14z/data=!4m2!4m1!3e0?entry=ttu` : 'https://www.google.com/maps/dir///@35.5736863,-78.5547264,14z/data=!4m2!4m1!3e0?entry=ttu';
+    window.open(mapsUrl,'_blank');
+  }
+};
+document.getElementById('reportReady').onclick = () => {
+  if (!activeJob) return;
+  const preConEmail = activeJob.preConEmail || '';
+  const tbeEmail = activeJob.tbeEmail || '';
+  const recipients = [preConEmail, tbeEmail].filter(e => e).join(',');
+  const ccList = 'dfunchess@palmettoairbalance.com';
+  const subject = `✅ ${activeJob.name || ''} ${activeJob.number || ''}`;
+  const body = `All,
+1.) Job is complete.
+2.) Synopsis added.
+3.) No changes to drawings.
+4.) Report data is ready for TBE review.
+5.) Job has or does not have an engineer stamp. Guarantee ?
+Thank you,`;
+  const mailtoLink = `mailto:${recipients ? encodeURIComponent(recipients) : ''}?cc=${encodeURIComponent(ccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = mailtoLink;
+};
+document.getElementById('startEmail').onclick = () => {
+  if (!activeJob) return;
+  const pmEmail = activeJob.pmEmail || '';
+  const preConEmail = activeJob.preConEmail || '';
+  const tbeEmail = activeJob.tbeEmail || '';
+  const ccList = [preConEmail, tbeEmail, 'dfunchess@palmettoairbalance.com'].filter(e => e).join(',');
+  const subject = `🔴 ${activeJob.name || ''} ${activeJob.number || ''}`;
+  const body = `All,
+I am the Project Manager for test and balance on this project.
+Please provide the following listed below for Test and Balance(TAB):
+SEND TO ME:
+🔴(Tentative start date for TAB)
+🔴(Project completion date for TAB)
+🔴(Pre TAB Checklist) Link➔ https://shorturl.at/LkY45
+SEND TO OUR PRECONSTRUCTION TEAM (IF NOT SENT ALREADY): dfunchess@palmettoairbalance.com
+🔴(TAB Specs and Tolerances)
+🔴(Equipment submittals)
+🔴(Final approved construction mechanical drawings to be used)
+Any important job requirements or information to help ensure a successful start is greatly appreciated!
+𝐍𝐎𝐓𝐄:
+• We schedule every Thursday for the following week.
+• If a start date has been requested, we will contact you on our scheduling day to confirm.
+• If you do not respond to confirm the schedule, your project will not be scheduled.
+Thank you,`;
+  if (pmEmail) {
+    window.location.href = `mailto:${encodeURIComponent(pmEmail)}?cc=${encodeURIComponent(ccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  } else {
+    alert('No Client PM email available for this job. Please enter it in the spreadsheet view.');
+  }
+};
+// Event listeners
+document.getElementById('prevMonth').onclick = () => { currentMonth--; if (currentMonth < 0) { currentMonth = 11; currentYear--; } renderAll(); };
+document.getElementById('nextMonth').onclick = () => { currentMonth++; if (currentMonth > 11) { currentMonth = 0; currentYear++; } renderAll(); };
+document.getElementById('backBtn').onclick = () => detailPane.classList.remove('open');
+document.getElementById('editBtn').onclick = openEditPane;
+document.getElementById('editBackBtn').onclick = () => editPane.classList.remove('open');
+document.getElementById('saveEditBtn').onclick = saveEditPane;
+document.querySelectorAll('#jobTable th').forEach(th => th.onclick = () => { sortJobs(th.dataset.field); renderList(); });
+document.getElementById('jobSearch').addEventListener('input', () => {
+  const query = document.getElementById('jobSearch').value.toLowerCase();
+  if (!query) { renderList(); return; }
+  const filtered = jobs.filter(j => (j.name||'').toLowerCase().includes(query) || (j.number||'').toLowerCase().includes(query) || (j.customer||'').toLowerCase().includes(query));
+  renderList(filtered.slice(0,10));
+});
+function sortJobs(field) {
+  const dir = sortDirection[field] === 'asc' ? 'desc' : 'asc';
+  sortDirection[field] = dir;
+  jobs.sort((a, b) => {
+    let valA = a[field] || '';
+    let valB = b[field] || '';
+    if (field === 'hours') { valA = parseFloat(valA) || 0; valB = parseFloat(valB) || 0; }
+    if (valA < valB) return dir === 'asc' ? -1 : 1;
+    if (valA > valB) return dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+}
+// Render everything
+function renderAll() {
+  renderCalendar();
+  renderList();
+  makeJobsDraggable();
+  if (window.hot) updateSpreadsheetData();
+}
+// Spreadsheet code
+let hot = null;
+function getAllKeys() {
+  if (jobs.length === 0) return [];
+  return Object.keys(jobs.reduce((acc, job) => ({...acc, ...job}), {}));
+}
+function getFilteredJobs(searchQuery) {
+  if (!searchQuery) return jobs;
+  const lowerQuery = searchQuery.toLowerCase();
+  return jobs.filter(job => Object.values(job).some(val => val != null && val.toString().toLowerCase().includes(lowerQuery)));
+}
+function getHandsontableData(searchQuery = '') {
+  const filteredJobs = getFilteredJobs(searchQuery);
+  if (filteredJobs.length === 0) return [[]];
+  const keys = getAllKeys();
+  const header = keys;
+  const data = filteredJobs.map(job => keys.map(key => job[key] ?? ''));
+  return [header, ...data];
+}
+function updateSpreadsheetData() {
+  const searchQuery = document.getElementById('spreadsheetSearch').value;
+  if (hot) hot.loadData(getHandsontableData(searchQuery));
+}
+function initSpreadsheet() {
+  const container = document.getElementById('spreadsheetContainer');
+  const data = getHandsontableData('');
+  hot = new Handsontable(container, {
+    data: data,
+    rowHeaders: true,
+    colHeaders: true,
+    height: '100%',
+    width: '100%',
+    licenseKey: 'non-commercial-and-evaluation',
+    stretchH: 'all',
+    fixedRowsTop: 1,
+    cells: function(row, col) { if (row === 0) return { readOnly: true, className: 'htHeader' }; },
+    afterChange: function(changes, source) {
+      if (source === 'loadData' || !changes) return;
+      changes.forEach(([row, prop, oldVal, newVal]) => {
+        if (row === 0) return;
+        const key = hot.getDataAtCell(0, prop);
+        const filteredJobs = getFilteredJobs(document.getElementById('spreadsheetSearch').value);
+        const actualJobIndex = jobs.indexOf(filteredJobs[row - 1]);
+        if (actualJobIndex !== -1) jobs[actualJobIndex][key] = newVal;
+      });
+      renderAll();
+    }
+  });
+}
+document.getElementById('viewSpreadsheet').onclick = () => {
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('spreadsheetView').classList.add('active');
+  if (!hot) initSpreadsheet();
+  else updateSpreadsheetData();
+};
+document.getElementById('backToMain').onclick = () => {
+  document.getElementById('spreadsheetView').classList.remove('active');
+  document.getElementById('app').style.display = 'flex';
+};
+document.getElementById('addRow').onclick = () => {
+  const newJob = {
+    name: 'New Job',
+    number: '',
+    startDate: '',
+    scheduledDate: '',
+    status: 'TAB',
+    fieldOps: 'TAB',
+    location: '',
+    customer: '',
+    hours: '',
+    clientProjectManager: '',
+    pmNumber: '',
+    pmEmail: '',
+    preConEmail: '',
+    tbeEmail: '',
+    notes: '',
+    statusWarning: false,
+    newJobFlag: false
+  };
+  jobs.push(newJob);
+  updateSpreadsheetData();
+  renderAll();
+};
+document.getElementById('addColumn').onclick = () => {
+  const colName = prompt('Enter new column name:');
+  if (!colName || !colName.trim()) return;
+  const cleanName = colName.trim();
+  jobs.forEach(job => { if (!(cleanName in job)) job[cleanName] = ''; });
+  updateSpreadsheetData();
+  alert(`Column "${cleanName}" added to all jobs!`);
+};
+document.getElementById('spreadsheetSearch').addEventListener('input', () => updateSpreadsheetData());
+
+// Always render calendar on load
+renderAll();
+</script>
+</body>
+</html>
