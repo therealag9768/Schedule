@@ -273,7 +273,7 @@ function checkAndAutoLoad() {
   }
 }
 
-// Load from Sheet - FIXED: full customer name preserved
+// Load from Sheet
 async function loadSheetData(silent = false) {
   if (!gapiInited) {
     if (!silent) alert('Google API not ready.');
@@ -289,12 +289,12 @@ async function loadSheetData(silent = false) {
       if (!silent) alert('No data found.');
       return;
     }
-    const headers = rows[0].map(h => h ? h.trim() : ''); // Clean headers only
+    const headers = rows[0].map(h => h ? h.trim() : '');
     jobs.length = 0;
     for (let i = 1; i < rows.length; i++) {
       const r = {};
       headers.forEach((h, idx) => {
-        r[h] = rows[i][idx] !== undefined ? String(rows[i][idx]).trim() : ''; // Preserve full string
+        r[h] = rows[i][idx] !== undefined ? String(rows[i][idx]).trim() : '';
       });
       let rawDate = r['Start Date'] || '';
       let parts = rawDate.split('/');
@@ -311,9 +311,9 @@ async function loadSheetData(silent = false) {
         status: r['Field Ops'] || 'TAB',
         fieldOps: r['Field Ops'] || 'TAB',
         location: r['Location'] || '',
-        customer: r['Customer'] || '', // FULL name kept intact (LLC, Inc, etc.)
+        customer: r['Customer'] || '',
         hours: r['Field Hours'] || '',
-        clientProjectManager: r['Client Project Manager'] || '', // Uses correct column
+        clientProjectManager: r['Client Project Manager'] || '',
         pmNumber: r['PM Number'] || '',
         pmEmail: r['PM Email'] || '',
         preConEmail: r['Pre Con Email'] || '',
@@ -331,7 +331,7 @@ async function loadSheetData(silent = false) {
   }
 }
 
-// Save to Sheet (unchanged)
+// Save to Sheet
 async function saveToSheet(silent = false) {
   if (authInProgress) return;
   authInProgress = true;
@@ -401,7 +401,7 @@ document.getElementById('saveSheet').onclick = () => saveToSheet(false);
 gapiLoad();
 gisLoaded();
 
-// === YOUR BASELINE CODE (rest unchanged) ===
+// === YOUR BASELINE CODE ===
 const jobs = [];
 let activeJob = null;
 let currentMonth = new Date().getMonth();
@@ -410,7 +410,7 @@ const monthNames = ['January','February','March','April','May','June','July','Au
 const sortDirection = {};
 let previousJobList = [];
 
-// Utility functions (unchanged)
+// Utility functions
 function statusClass(v) {
   v = (v || 'TAB').toLowerCase();
   if (v === 'complete') return 'status-blue';
@@ -592,115 +592,104 @@ function saveEditPane() {
   triggerAutoSave();
   openJob(activeJob);
 }
+
+// Robust CSV upload with SheetJS
 function triggerFileInput() {
-  const i = document.createElement('input');
-  i.type = 'file';
-  i.accept = '.csv,.xls,.xlsx';
-  i.onchange = e => {
-    const f = e.target.files[0];
-    const r = new FileReader();
-    r.onload = ev => {
-      let csv;
-      if (f.name.endsWith('.csv')) csv = ev.target.result;
-      else {
-        const wb = XLSX.read(ev.target.result, {type: 'array'});
-        csv = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]]);
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.csv,.xls,.xlsx';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = ev.target.result;
+        const workbook = XLSX.read(data, { type: file.name.endsWith('.csv') ? 'string' : 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // Convert sheet to array of arrays (header row + data)
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+        
+        if (jsonData.length < 1) {
+          alert('Empty file.');
+          return;
+        }
+
+        const headers = jsonData[0].map(h => (h || '').trim());
+        const rows = jsonData.slice(1);
+
+        rows.forEach(row => {
+          const r = {};
+          headers.forEach((h, i) => {
+            r[h] = row[i] !== undefined ? String(row[i]).trim() : '';
+          });
+
+          if (!r['Name'] && !r['Job Number']) return;
+
+          let existing = jobs.find(j => j.name === r['Name'] && j.number === r['Job Number']);
+          if (existing) {
+            if ((existing.status || '') !== r['Field Ops']) {
+              existing.statusWarning = true;
+            }
+            return;
+          }
+
+          let rawDate = r['Start Date'] || '';
+          let parts = rawDate.split('/');
+          if (parts.length === 3) {
+            parts[0] = parseInt(parts[0], 10).toString();
+            parts[1] = parseInt(parts[1], 10).toString();
+            rawDate = parts.join('/');
+          }
+
+          const newJob = {
+            name: r['Name'] || '',
+            number: r['Job Number'] || '',
+            startDate: rawDate,
+            scheduledDate: rawDate,
+            status: r['Field Ops'] || 'TAB',
+            fieldOps: r['Field Ops'] || 'TAB',
+            location: r['Location'] || '',
+            customer: r['Customer'] || '',
+            hours: r['Field Hours'] || '',
+            clientProjectManager: r['Client Project Manager'] || '',
+            pmNumber: r['PM Number'] || '',
+            pmEmail: r['PM Email'] || '',
+            preConEmail: r['Pre Con Email'] || '',
+            tbeEmail: r['TBE Email'] || '',
+            notes: '',
+            statusWarning: false,
+            newJobFlag: previousJobList.length > 0 ? true : false
+          };
+
+          jobs.push(newJob);
+        });
+
+        previousJobList = jobs.map(j => ({name: j.name, number: j.number}));
+        sortJobs('fieldOps');
+        renderAll();
+        triggerAutoSave();
+
+        alert('CSV/XLSX imported successfully!');
+      } catch (err) {
+        console.error('Import error:', err);
+        alert('Failed to import file: ' + (err.message || 'Unknown error'));
       }
-      parseCSV(csv);
     };
-    f.name.endsWith('.csv') ? r.readAsText(f) : r.readAsArrayBuffer(f);
+
+    if (file.name.endsWith('.csv')) {
+      reader.readAsText(file);
+    } else {
+      reader.readAsArrayBuffer(file);
+    }
   };
-  i.click();
+  input.click();
 }
 document.getElementById('uploadCSV').onclick = triggerFileInput;
-function parseCSV(t) {
-  const lines = t.split(/\r?\n/).filter(l => l.trim());
-  if (!lines.length) return;
-  const headerLine = lines.shift();
-  const headers = [];
-  let currentHeader = '';
-  let inQuote = false;
-  for (let char of headerLine + ',') {
-    if (inQuote) {
-      currentHeader += char;
-      if (char === '"') inQuote = false;
-    } else {
-      if (char === '"') {
-        inQuote = true;
-        currentHeader += char;
-      } else if (char === ',') {
-        headers.push(currentHeader.trim().replace(/^"|"$/g, ''));
-        currentHeader = '';
-      } else {
-        currentHeader += char;
-      }
-    }
-  }
 
-  lines.forEach(l => {
-    const values = [];
-    let currentValue = '';
-    let inQuote = false;
-    for (let char of l + ',') {
-      if (inQuote) {
-        currentValue += char;
-        if (char === '"') inQuote = false;
-      } else {
-        if (char === '"') {
-          inQuote = true;
-          currentValue += char;
-        } else if (char === ',') {
-          values.push(currentValue.trim().replace(/^"|"$/g, ''));
-          currentValue = '';
-        } else {
-          currentValue += char;
-        }
-      }
-    }
-
-    const r = {};
-    headers.forEach((h, i) => r[h] = values[i] || '');
-
-    let existing = jobs.find(j => j.name === r['Name'] && j.number === r['Job Number']);
-    if (existing) {
-      if ((existing.status || '') !== r['Field Ops']) {
-        existing.statusWarning = true;
-      }
-      return;
-    }
-    let rawDate = r['Start Date'] || '';
-    let parts = rawDate.split('/');
-    if (parts.length === 3) {
-      parts[0] = parseInt(parts[0], 10).toString();
-      parts[1] = parseInt(parts[1], 10).toString();
-      rawDate = parts.join('/');
-    }
-    const newJob = {
-      name: r['Name'] || '',
-      number: r['Job Number'] || '',
-      startDate: rawDate,
-      scheduledDate: rawDate,
-      status: r['Field Ops'] || 'TAB',
-      fieldOps: r['Field Ops'] || 'TAB',
-      location: r['Location'] || '',
-      customer: r['Customer'] || '', // Full name preserved
-      hours: r['Field Hours'] || '',
-      clientProjectManager: r['Client Project Manager'] || '', // Correct column
-      pmNumber: r['PM Number'] || '',
-      pmEmail: r['PM Email'] || '',
-      preConEmail: r['Pre Con Email'] || '',
-      tbeEmail: r['TBE Email'] || '',
-      notes: '',
-      statusWarning: false,
-      newJobFlag: previousJobList.length > 0 ? true : false
-    };
-    jobs.push(newJob);
-  });
-  previousJobList = jobs.map(j => ({name: j.name, number: j.number}));
-  sortJobs('fieldOps');
-  renderAll();
-  triggerAutoSave();
-}
 // Download & modal
 document.getElementById('downloadAirOne').onclick = () => {
   window.open('https://airone.palmettoairbalance.com/project_management/projects/?_export=xls','_blank');
