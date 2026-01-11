@@ -107,7 +107,7 @@ html, body {width:100%;height:100%;margin:0;padding:0;overflow-x:hidden;}
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css">
 <script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
-<!-- Google APIs for Sheets (read + write) -->
+<!-- Google APIs -->
 <script src="https://apis.google.com/js/api.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -241,7 +241,7 @@ function gapiLoad() {
         discoveryDocs: [DISCOVERY_DOC],
       });
       gapiInited = true;
-      console.log('GAPI client initialized');
+      console.log('GAPI initialized');
     } catch (err) {
       console.error('GAPI error:', err);
     }
@@ -260,10 +260,6 @@ function gisLoaded() {
 
 // Load from Sheet (read-only)
 async function loadSheetData() {
-  if (!gapiInited) {
-    alert('Google API not ready yet.');
-    return;
-  }
   try {
     const response = await gapi.client.sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
@@ -271,7 +267,7 @@ async function loadSheetData() {
     });
     const rows = response.result.values || [];
     if (rows.length === 0) {
-      alert('No data found in sheet.');
+      alert('No data in sheet.');
       return;
     }
     const headers = rows[0];
@@ -307,19 +303,18 @@ async function loadSheetData() {
       });
     }
     renderAll();
-    alert(`Loaded ${jobs.length} jobs from Google Sheet!`);
+    console.log('Loaded from Sheet');
   } catch (err) {
     console.error('Load error:', err);
-    alert('Load failed - check console (F12)');
   }
 }
 
-// Manual Save (OAuth first time only)
+// Auto-save on changes
 async function saveToSheet() {
   if (!gapi.client.getToken()) {
     tokenClient.callback = async (resp) => {
       if (resp.error) {
-        alert('Sign-in failed: ' + resp.error);
+        console.error('Token error:', resp.error);
         return;
       }
       await performSave();
@@ -358,106 +353,22 @@ async function performSave() {
       valueInputOption: 'RAW',
       resource: { values }
     });
-    alert('Successfully saved to Google Sheet!');
+    console.log('Auto-saved to Sheet');
   } catch (err) {
     console.error('Save error:', err);
-    alert('Save failed - check console (F12)');
   }
 }
 
-document.getElementById('loadSheet').onclick = loadSheetData;
-document.getElementById('saveSheet').onclick = saveToSheet;
+// Auto-load on page open
+window.addEventListener('load', async () => {
+  if (gapiInited && gisInited) {
+    await loadSheetData();
+  }
+});
 
-// Initialize Google APIs
+// Init APIs
 gapiLoad();
 gisLoaded();
-
-// === FIXED UPLOAD CSV / XLS (restored working version with better error handling) ===
-function triggerFileInput() {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.csv,.xls,.xlsx';
-  input.onchange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      let csv;
-      if (file.name.endsWith('.csv')) {
-        csv = ev.target.result;
-      } else {
-        try {
-          const workbook = XLSX.read(ev.target.result, {type: 'array'});
-          csv = XLSX.utils.sheet_to_csv(workbook.Sheets[workbook.SheetNames[0]]);
-        } catch (err) {
-          alert('Failed to read XLS/XLSX file. Try a CSV instead.');
-          console.error(err);
-          return;
-        }
-      }
-      parseCSV(csv);
-    };
-    if (file.name.endsWith('.csv')) {
-      reader.readAsText(file);
-    } else {
-      reader.readAsArrayBuffer(file);
-    }
-  };
-  input.click();
-}
-document.getElementById('uploadCSV').onclick = triggerFileInput;
-
-function parseCSV(t) {
-  const lines = t.split(/\r?\n/).filter(l => l.trim());
-  if (!lines.length) {
-    alert('Empty file.');
-    return;
-  }
-  const headerLine = lines.shift();
-  const headers = headerLine.split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-  lines.forEach(l => {
-    const values = l.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-    const r = {};
-    headers.forEach((h, i) => r[h] = values[i] || '');
-    let existing = jobs.find(j => j.name === r['Name'] && j.number === r['Job Number']);
-    if (existing) {
-      if ((existing.status || '') !== r['Field Ops']) {
-        existing.statusWarning = true;
-      }
-      return;
-    }
-    let rawDate = r['Start Date'] || '';
-    let parts = rawDate.split('/');
-    if (parts.length === 3) {
-      parts[0] = parseInt(parts[0], 10).toString();
-      parts[1] = parseInt(parts[1], 10).toString();
-      rawDate = parts.join('/');
-    }
-    const newJob = {
-      name: r['Name'] || '',
-      number: r['Job Number'] || '',
-      startDate: rawDate,
-      scheduledDate: rawDate,
-      status: r['Field Ops'] || 'TAB',
-      fieldOps: r['Field Ops'] || 'TAB',
-      location: r['Location'] || '',
-      customer: r['Customer'] || '',
-      hours: r['Field Hours'] || '',
-      clientProjectManager: r['Client Project Manager'] || '',
-      pmNumber: r['PM Number'] || '',
-      pmEmail: r['PM Email'] || '',
-      preConEmail: r['Pre Con Email'] || '',
-      tbeEmail: r['TBE Email'] || '',
-      notes: '',
-      statusWarning: false,
-      newJobFlag: previousJobList.length > 0 ? true : false
-    };
-    jobs.push(newJob);
-  });
-  previousJobList = jobs.map(j => ({name: j.name, number: j.number}));
-  sortJobs('fieldOps');
-  renderAll();
-}
 
 // === YOUR BASELINE CODE (unchanged) ===
 const jobs = [];
@@ -541,6 +452,7 @@ function makeJobsDraggable() {
       if (draggedJob) {
         draggedJob.scheduledDate = day.dataset.date;
         renderAll();
+        saveToSheet(); // Auto-save on drag
         draggedJob = null;
       }
     };
@@ -573,6 +485,7 @@ document.addEventListener('click', e => {
       newJobFlag: false
     });
     renderAll();
+    saveToSheet(); // Auto-save on add
   }
 });
 // Table render
@@ -612,6 +525,7 @@ document.getElementById('notes').addEventListener('input', () => {
   if (activeJob) {
     activeJob.notes = document.getElementById('notes').value;
     autoGrowNotes();
+    saveToSheet(); // Auto-save
   }
 });
 // Edit pane
@@ -652,7 +566,120 @@ function saveEditPane() {
   });
   editPane.classList.remove('open');
   renderAll();
+  saveToSheet(); // Auto-save
   openJob(activeJob);
+}
+// File upload
+function triggerFileInput() {
+  const i = document.createElement('input');
+  i.type = 'file';
+  i.accept = '.csv,.xls,.xlsx';
+  i.onchange = e => {
+    const f = e.target.files[0];
+    const r = new FileReader();
+    r.onload = ev => {
+      let csv;
+      if (f.name.endsWith('.csv')) csv = ev.target.result;
+      else {
+        const wb = XLSX.read(ev.target.result, {type: 'array'});
+        csv = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]]);
+      }
+      parseCSV(csv);
+      saveToSheet(); // Auto-save after upload
+    };
+    f.name.endsWith('.csv') ? r.readAsText(f) : r.readAsArrayBuffer(f);
+  };
+  i.click();
+}
+document.getElementById('uploadCSV').onclick = triggerFileInput;
+// Parse CSV
+function parseCSV(t) {
+  const lines = t.split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return;
+  const headerLine = lines.shift();
+  const headers = [];
+  let currentHeader = '';
+  let inQuote = false;
+  for (let char of headerLine + ',') {
+    if (inQuote) {
+      currentHeader += char;
+      if (char === '"') inQuote = false;
+    } else {
+      if (char === '"') {
+        inQuote = true;
+        currentHeader += char;
+      } else if (char === ',') {
+        headers.push(currentHeader.trim().replace(/^"|"$/g, ''));
+        currentHeader = '';
+      } else {
+        currentHeader += char;
+      }
+    }
+  }
+
+  lines.forEach(l => {
+    const values = [];
+    let currentValue = '';
+    let inQuote = false;
+    for (let char of l + ',') {
+      if (inQuote) {
+        currentValue += char;
+        if (char === '"') inQuote = false;
+      } else {
+        if (char === '"') {
+          inQuote = true;
+          currentValue += char;
+        } else if (char === ',') {
+          values.push(currentValue.trim().replace(/^"|"$/g, ''));
+          currentValue = '';
+        } else {
+          currentValue += char;
+        }
+      }
+    }
+
+    const r = {};
+    headers.forEach((h, i) => r[h] = values[i] || '');
+
+    let existing = jobs.find(j => j.name === r['Name'] && j.number === r['Job Number']);
+    if (existing) {
+      if ((existing.status || '') !== r['Field Ops']) {
+        existing.statusWarning = true;
+      }
+      return;
+    }
+    let rawDate = r['Start Date'] || '';
+    let parts = rawDate.split('/');
+    if (parts.length === 3) {
+      parts[0] = parseInt(parts[0], 10).toString();
+      parts[1] = parseInt(parts[1], 10).toString();
+      rawDate = parts.join('/');
+    }
+    const newJob = {
+      name: r['Name'] || '',
+      number: r['Job Number'] || '',
+      startDate: rawDate,
+      scheduledDate: rawDate,
+      status: r['Field Ops'] || 'TAB',
+      fieldOps: r['Field Ops'] || 'TAB',
+      location: r['Location'] || '',
+      customer: r['Customer'] || '',
+      hours: r['Field Hours'] || '',
+      clientProjectManager: r['Client Project Manager'] || '',
+      pmNumber: r['PM Number'] || '',
+      pmEmail: r['PM Email'] || '',
+      preConEmail: r['Pre Con Email'] || '',
+      tbeEmail: r['TBE Email'] || '',
+      notes: '',
+      statusWarning: false,
+      newJobFlag: previousJobList.length > 0 ? true : false
+    };
+    jobs.push(newJob);
+  });
+  previousJobList = jobs.map(j => ({name: j.name, number: j.number}));
+  sortJobs('fieldOps');
+  renderAll();
+  saveToSheet(); // Auto-save after parse
 }
 // Download & modal
 document.getElementById('downloadAirOne').onclick = () => {
@@ -832,6 +859,7 @@ function initSpreadsheet() {
         if (actualJobIndex !== -1) jobs[actualJobIndex][key] = newVal;
       });
       renderAll();
+      saveToSheet(); // Auto-save on spreadsheet edit
     }
   });
 }
@@ -868,6 +896,7 @@ document.getElementById('addRow').onclick = () => {
   jobs.push(newJob);
   updateSpreadsheetData();
   renderAll();
+  saveToSheet(); // Auto-save
 };
 document.getElementById('addColumn').onclick = () => {
   const colName = prompt('Enter new column name:');
@@ -876,8 +905,13 @@ document.getElementById('addColumn').onclick = () => {
   jobs.forEach(job => { if (!(cleanName in job)) job[cleanName] = ''; });
   updateSpreadsheetData();
   alert(`Column "${cleanName}" added to all jobs!`);
+  saveToSheet(); // Auto-save
 };
 document.getElementById('spreadsheetSearch').addEventListener('input', () => updateSpreadsheetData());
+
+// Initialize Google APIs
+gapiLoad();
+gisLoaded();
 
 // Always render calendar on load (empty grid)
 renderAll();
