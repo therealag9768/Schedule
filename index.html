@@ -219,6 +219,7 @@ html, body {width:100%;height:100%;margin:0;padding:0;overflow-x:hidden;}
     <button id="triggerUpload">Upload File</button>
   </div>
 </div>
+
 <script>
 // === GOOGLE SHEETS CONFIG ===
 const SHEET_ID = '1HHigA2FLOc-R4s4nBKKmQb8cJo4hLdrVn5ACUA-HNjY';
@@ -272,7 +273,7 @@ function checkAndAutoLoad() {
   }
 }
 
-// Load from Sheet
+// Load from Sheet - FIXED: full customer name preserved
 async function loadSheetData(silent = false) {
   if (!gapiInited) {
     if (!silent) alert('Google API not ready.');
@@ -288,11 +289,13 @@ async function loadSheetData(silent = false) {
       if (!silent) alert('No data found.');
       return;
     }
-    const headers = rows[0];
+    const headers = rows[0].map(h => h ? h.trim() : ''); // Clean headers only
     jobs.length = 0;
     for (let i = 1; i < rows.length; i++) {
       const r = {};
-      headers.forEach((h, idx) => r[h] = rows[i][idx] || '');
+      headers.forEach((h, idx) => {
+        r[h] = rows[i][idx] !== undefined ? String(rows[i][idx]).trim() : ''; // Preserve full string
+      });
       let rawDate = r['Start Date'] || '';
       let parts = rawDate.split('/');
       if (parts.length === 3) {
@@ -308,9 +311,9 @@ async function loadSheetData(silent = false) {
         status: r['Field Ops'] || 'TAB',
         fieldOps: r['Field Ops'] || 'TAB',
         location: r['Location'] || '',
-        customer: r['Customer'] || '',
+        customer: r['Customer'] || '', // FULL name kept intact (LLC, Inc, etc.)
         hours: r['Field Hours'] || '',
-        clientProjectManager: r['Client Project Manager'] || '',
+        clientProjectManager: r['Client Project Manager'] || '', // Uses correct column
         pmNumber: r['PM Number'] || '',
         pmEmail: r['PM Email'] || '',
         preConEmail: r['Pre Con Email'] || '',
@@ -328,7 +331,7 @@ async function loadSheetData(silent = false) {
   }
 }
 
-// Save to Sheet
+// Save to Sheet (unchanged)
 async function saveToSheet(silent = false) {
   if (authInProgress) return;
   authInProgress = true;
@@ -383,23 +386,22 @@ async function performSave(silent = false) {
   }
 }
 
-// Auto-load on page open
-window.addEventListener('load', () => {
-  checkAndAutoLoad();
-});
-
-// Auto-save trigger (debounced)
+// Auto-save trigger (debounced 2s)
 let autoSaveTimeout;
 function triggerAutoSave() {
   clearTimeout(autoSaveTimeout);
   autoSaveTimeout = setTimeout(() => saveToSheet(true), 2000);
 }
 
+// Manual buttons
+document.getElementById('loadSheet').onclick = () => loadSheetData(false);
+document.getElementById('saveSheet').onclick = () => saveToSheet(false);
+
 // Init APIs
 gapiLoad();
 gisLoaded();
 
-// === YOUR BASELINE CODE (unchanged except auto-save calls) ===
+// === YOUR BASELINE CODE (rest unchanged) ===
 const jobs = [];
 let activeJob = null;
 let currentMonth = new Date().getMonth();
@@ -408,7 +410,7 @@ const monthNames = ['January','February','March','April','May','June','July','Au
 const sortDirection = {};
 let previousJobList = [];
 
-// Utility functions
+// Utility functions (unchanged)
 function statusClass(v) {
   v = (v || 'TAB').toLowerCase();
   if (v === 'complete') return 'status-blue';
@@ -421,7 +423,6 @@ function statusClass(v) {
 function daysInMonth(month, year) {
   return new Date(year, month + 1, 0).getDate();
 }
-// Auto-grow notes
 function autoGrowNotes() {
   const notes = document.getElementById('notes');
   if (notes) {
@@ -429,7 +430,6 @@ function autoGrowNotes() {
     notes.style.height = notes.scrollHeight + 'px';
   }
 }
-// Calendar render - always visible
 function renderCalendar() {
   document.getElementById('currentMonthLabel').textContent = monthNames[currentMonth] + ' ' + currentYear;
   const cal = document.getElementById('calendar');
@@ -464,7 +464,6 @@ function renderCalendar() {
     cal.appendChild(day);
   }
 }
-// Drag & drop + auto-save
 let draggedJob = null;
 function makeJobsDraggable() {
   document.querySelectorAll('.calendar-job').forEach(el => {
@@ -487,7 +486,6 @@ function makeJobsDraggable() {
     };
   });
 }
-// Manual add + auto-save
 document.addEventListener('click', e => {
   if (e.target.classList.contains('calendar-day') && e.target.children.length === 1) {
     const selectedDate = e.target.dataset.date;
@@ -517,7 +515,6 @@ document.addEventListener('click', e => {
     triggerAutoSave();
   }
 });
-// Table render
 function renderList(filteredJobs) {
   const tbody = document.querySelector('#jobTable tbody');
   tbody.innerHTML = '';
@@ -531,7 +528,6 @@ function renderList(filteredJobs) {
     tbody.appendChild(tr);
   });
 }
-// Open job
 function openJob(j) {
   activeJob = j;
   document.getElementById('detailTitle').textContent = `${j.name||'Unnamed'} ${j.number||''}`;
@@ -549,7 +545,6 @@ function openJob(j) {
   autoGrowNotes();
   detailPane.classList.add('open');
 }
-// Auto-save notes
 document.getElementById('notes').addEventListener('input', () => {
   if (activeJob) {
     activeJob.notes = document.getElementById('notes').value;
@@ -557,7 +552,6 @@ document.getElementById('notes').addEventListener('input', () => {
     triggerAutoSave();
   }
 });
-// Edit pane + auto-save
 function getUnique(field) {
   return [...new Set(jobs.map(j => j[field] || '').filter(v => v.trim()))].sort();
 }
@@ -598,7 +592,6 @@ function saveEditPane() {
   triggerAutoSave();
   openJob(activeJob);
 }
-// File upload + auto-save
 function triggerFileInput() {
   const i = document.createElement('input');
   i.type = 'file';
@@ -614,14 +607,12 @@ function triggerFileInput() {
         csv = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]]);
       }
       parseCSV(csv);
-      triggerAutoSave();
     };
     f.name.endsWith('.csv') ? r.readAsText(f) : r.readAsArrayBuffer(f);
   };
   i.click();
 }
 document.getElementById('uploadCSV').onclick = triggerFileInput;
-// Parse CSV
 function parseCSV(t) {
   const lines = t.split(/\r?\n/).filter(l => l.trim());
   if (!lines.length) return;
@@ -692,9 +683,9 @@ function parseCSV(t) {
       status: r['Field Ops'] || 'TAB',
       fieldOps: r['Field Ops'] || 'TAB',
       location: r['Location'] || '',
-      customer: r['Customer'] || '',
+      customer: r['Customer'] || '', // Full name preserved
       hours: r['Field Hours'] || '',
-      clientProjectManager: r['Client Project Manager'] || '',
+      clientProjectManager: r['Client Project Manager'] || '', // Correct column
       pmNumber: r['PM Number'] || '',
       pmEmail: r['PM Email'] || '',
       preConEmail: r['Pre Con Email'] || '',
@@ -708,7 +699,7 @@ function parseCSV(t) {
   previousJobList = jobs.map(j => ({name: j.name, number: j.number}));
   sortJobs('fieldOps');
   renderAll();
-  triggerAutoSave(); // Auto-save after upload
+  triggerAutoSave();
 }
 // Download & modal
 document.getElementById('downloadAirOne').onclick = () => {
@@ -888,7 +879,7 @@ function initSpreadsheet() {
         if (actualJobIndex !== -1) jobs[actualJobIndex][key] = newVal;
       });
       renderAll();
-      triggerAutoSave(); // Auto-save on spreadsheet edit
+      triggerAutoSave();
     }
   });
 }
@@ -925,7 +916,7 @@ document.getElementById('addRow').onclick = () => {
   jobs.push(newJob);
   updateSpreadsheetData();
   renderAll();
-  triggerAutoSave(); // Auto-save
+  triggerAutoSave();
 };
 document.getElementById('addColumn').onclick = () => {
   const colName = prompt('Enter new column name:');
@@ -934,7 +925,7 @@ document.getElementById('addColumn').onclick = () => {
   jobs.forEach(job => { if (!(cleanName in job)) job[cleanName] = ''; });
   updateSpreadsheetData();
   alert(`Column "${cleanName}" added to all jobs!`);
-  triggerAutoSave(); // Auto-save
+  triggerAutoSave();
 };
 document.getElementById('spreadsheetSearch').addEventListener('input', () => updateSpreadsheetData());
 
