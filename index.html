@@ -538,7 +538,7 @@ function saveEditPane() {
   openJob(activeJob);
 }
 
-// ROBUST CSV IMPORT WITH SHEETJS (FIXES HOURS SHIFT)
+// ROBUST CSV IMPORT WITH SHEETJS (MATCHES YOUR AIRONE HEADERS)
 function triggerFileInput() {
   const input = document.createElement('input');
   input.type = 'file';
@@ -570,6 +570,7 @@ function triggerFileInput() {
             r[h] = row[i] !== undefined ? String(row[i]).trim() : '';
           });
 
+          // Skip rows without key identifiers
           if (!r['Name'] && !r['Job Number']) return;
 
           let existing = jobs.find(j => j.name === r['Name'] && j.number === r['Job Number']);
@@ -595,14 +596,14 @@ function triggerFileInput() {
             scheduledDate: rawDate,
             status: r['Field Ops'] || 'TAB',
             fieldOps: r['Field Ops'] || 'TAB',
-            location: r['Location'] || '',
+            location: '', // Not in CSV - leave blank or map if needed
             customer: r['Customer'] || '',
             hours: r['Field Hours'] || '',
             clientProjectManager: r['Client Project Manager'] || '',
-            pmNumber: r['PM Number'] || '',
-            pmEmail: r['PM Email'] || '',
-            preConEmail: r['Pre Con Email'] || '',
-            tbeEmail: r['TBE Email'] || '',
+            pmNumber: '', // Not in CSV
+            pmEmail: '', // Not in CSV
+            preConEmail: '', // Not in CSV
+            tbeEmail: '', // Not in CSV
             notes: '',
             statusWarning: false,
             newJobFlag: previousJobList.length > 0 ? true : false
@@ -616,7 +617,7 @@ function triggerFileInput() {
         renderAll();
         triggerAutoSave();
 
-        alert('Imported successfully!');
+        alert('CSV/XLSX imported successfully!');
       } catch (err) {
         console.error('Import error:', err);
         alert('Import failed: ' + (err.message || 'Unknown error'));
