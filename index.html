@@ -219,7 +219,6 @@ html, body {width:100%;height:100%;margin:0;padding:0;overflow-x:hidden;}
     <button id="triggerUpload">Upload File</button>
   </div>
 </div>
-
 <script>
 // === GOOGLE SHEETS CONFIG ===
 const SHEET_ID = '1HHigA2FLOc-R4s4nBKKmQb8cJo4hLdrVn5ACUA-HNjY';
@@ -242,8 +241,8 @@ function gapiLoad() {
         discoveryDocs: [DISCOVERY_DOC],
       });
       gapiInited = true;
-      console.log('GAPI client initialized');
-      if (gisInited) autoLoadOnStart();
+      console.log('GAPI initialized');
+      checkAndAutoLoad();
     } catch (err) {
       console.error('GAPI error:', err);
     }
@@ -252,26 +251,31 @@ function gapiLoad() {
 
 // GIS OAuth init
 function gisLoaded() {
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: SCOPES,
-    callback: '', // set dynamically
-  });
-  gisInited = true;
-  if (gapiInited) autoLoadOnStart();
+  try {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: '', // set dynamically
+    });
+    gisInited = true;
+    console.log('GIS initialized');
+    checkAndAutoLoad();
+  } catch (err) {
+    console.error('GIS error:', err);
+  }
 }
 
-// Auto-load on page open
-function autoLoadOnStart() {
+// Check if APIs ready & auto-load
+function checkAndAutoLoad() {
   if (gapiInited && gisInited && !authInProgress) {
-    loadSheetData(true); // silent = true
+    loadSheetData(true); // silent auto-load
   }
 }
 
 // Load from Sheet
 async function loadSheetData(silent = false) {
   if (!gapiInited) {
-    if (!silent) alert('Google API not ready yet.');
+    if (!silent) alert('Google API not ready.');
     return;
   }
   try {
@@ -281,7 +285,7 @@ async function loadSheetData(silent = false) {
     });
     const rows = response.result.values || [];
     if (rows.length === 0) {
-      if (!silent) alert('No data found in sheet.');
+      if (!silent) alert('No data found.');
       return;
     }
     const headers = rows[0];
@@ -317,15 +321,14 @@ async function loadSheetData(silent = false) {
       });
     }
     renderAll();
-    if (!silent) alert(`Loaded ${jobs.length} jobs from Google Sheet!`);
-    console.log('Loaded from Sheet');
+    if (!silent) alert(`Loaded ${jobs.length} jobs!`);
   } catch (err) {
     console.error('Load error:', err);
-    if (!silent) alert('Load failed - check console (F12)');
+    if (!silent) alert('Load failed.');
   }
 }
 
-// Save to Sheet (with auth if needed)
+// Save to Sheet
 async function saveToSheet(silent = false) {
   if (authInProgress) return;
   authInProgress = true;
@@ -333,8 +336,7 @@ async function saveToSheet(silent = false) {
     tokenClient.callback = async (resp) => {
       authInProgress = false;
       if (resp.error) {
-        console.error('Token error:', resp.error);
-        if (!silent) alert('Sign-in failed: ' + resp.error);
+        if (!silent) alert('Sign-in failed.');
         return;
       }
       await performSave(silent);
@@ -374,34 +376,30 @@ async function performSave(silent = false) {
       valueInputOption: 'RAW',
       resource: { values }
     });
-    if (!silent) alert('Successfully saved to Google Sheet!');
-    console.log('Saved to Sheet');
+    if (!silent) alert('Saved!');
   } catch (err) {
     console.error('Save error:', err);
-    if (!silent) alert('Save failed - check console (F12)');
+    if (!silent) alert('Save failed.');
   }
 }
 
-// Auto-save trigger (debounced to ~2 seconds)
+// Auto-load on page open
+window.addEventListener('load', () => {
+  checkAndAutoLoad();
+});
+
+// Auto-save trigger (debounced)
 let autoSaveTimeout;
 function triggerAutoSave() {
   clearTimeout(autoSaveTimeout);
   autoSaveTimeout = setTimeout(() => saveToSheet(true), 2000);
 }
 
-// Initialize Google APIs and auto-load
+// Init APIs
 gapiLoad();
 gisLoaded();
 
-// Auto-load when both APIs are ready
-const checkInitInterval = setInterval(() => {
-  if (gapiInited && gisInited) {
-    loadSheetData(true); // auto-load silently
-    clearInterval(checkInitInterval);
-  }
-}, 500);
-
-// === YOUR BASELINE CODE (unchanged except auto-save calls added) ===
+// === YOUR BASELINE CODE (unchanged except auto-save calls) ===
 const jobs = [];
 let activeJob = null;
 let currentMonth = new Date().getMonth();
@@ -483,7 +481,7 @@ function makeJobsDraggable() {
       if (draggedJob) {
         draggedJob.scheduledDate = day.dataset.date;
         renderAll();
-        triggerAutoSave(); // Auto-save on drag
+        triggerAutoSave();
         draggedJob = null;
       }
     };
@@ -516,7 +514,7 @@ document.addEventListener('click', e => {
       newJobFlag: false
     });
     renderAll();
-    triggerAutoSave(); // Auto-save on manual add
+    triggerAutoSave();
   }
 });
 // Table render
@@ -556,7 +554,7 @@ document.getElementById('notes').addEventListener('input', () => {
   if (activeJob) {
     activeJob.notes = document.getElementById('notes').value;
     autoGrowNotes();
-    triggerAutoSave(); // Auto-save
+    triggerAutoSave();
   }
 });
 // Edit pane + auto-save
@@ -597,7 +595,7 @@ function saveEditPane() {
   });
   editPane.classList.remove('open');
   renderAll();
-  triggerAutoSave(); // Auto-save
+  triggerAutoSave();
   openJob(activeJob);
 }
 // File upload + auto-save
@@ -616,14 +614,14 @@ function triggerFileInput() {
         csv = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]]);
       }
       parseCSV(csv);
-      triggerAutoSave(); // Auto-save after upload
+      triggerAutoSave();
     };
     f.name.endsWith('.csv') ? r.readAsText(f) : r.readAsArrayBuffer(f);
   };
   i.click();
 }
 document.getElementById('uploadCSV').onclick = triggerFileInput;
-// Parse CSV (unchanged)
+// Parse CSV
 function parseCSV(t) {
   const lines = t.split(/\r?\n/).filter(l => l.trim());
   if (!lines.length) return;
@@ -710,6 +708,7 @@ function parseCSV(t) {
   previousJobList = jobs.map(j => ({name: j.name, number: j.number}));
   sortJobs('fieldOps');
   renderAll();
+  triggerAutoSave(); // Auto-save after upload
 }
 // Download & modal
 document.getElementById('downloadAirOne').onclick = () => {
