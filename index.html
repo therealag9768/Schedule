@@ -39,75 +39,32 @@ header{padding:14px;background:#1e88e5;color:#fff;font-size:24px;font-weight:600
 .row{display:flex;justify-content:space-between;margin-bottom:10px;font-size:16px}
 select,textarea,input[type="text"]{width:100%;padding:12px;border-radius:12px;border:1px solid #ccc;font-size:16px;box-sizing:border-box;margin-top:6px}
 textarea#notes{resize:none;overflow:hidden;min-height:100px}
-
-/* Unified button style for ALL slide-out buttons */
-.detail-pane-button {
-  padding: 14px;
-  min-height: 52px;
-  border: none;
-  border-radius: 14px;
-  background: #1e88e5;
-  color: #fff;
-  font-size: 16px;
-  cursor: pointer;
-  text-align: center;
-  box-sizing: border-box;
-  font-weight: 500;
-  width: 100%;
-  max-width: none;
-}
-
-.btnGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-top: 12px;
-}
-.btnGrid button { @extend .detail-pane-button; }
-
-.contactSection { text-align: center; }
-.contactButtons {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  margin-top: 8px;
-  flex-wrap: wrap;
-}
-.contactButtons button { @extend .detail-pane-button; }
-
-@media (max-width: 768px) {
-  .btnGrid {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-  .contactButtons {
-    flex-direction: column;
-    gap: 10px;
-  }
-}
-
+.detail-pane-button{padding:14px;min-height:52px;border:none;border-radius:14px;background:#1e88e5;color:#fff;font-size:16px;cursor:pointer;text-align:center;box-sizing:border-box;font-weight:500;width:100%;max-width:none}
+.btnGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.btnGrid button{@extend .detail-pane-button}
+.contactSection{text-align:center}
+.contactButtons{display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap}
+.contactButtons button{@extend .detail-pane-button}
+@media(max-width:768px){.btnGrid{grid-template-columns:1fr;gap:10px}.contactButtons{flex-direction:column;gap:10px}}
 #jobSearch{margin:12px 0;padding:8px 12px;font-size:18px;border-radius:8px;border:1px solid #ccc;width:100%;max-width:1075px;box-sizing:border-box}
-/* Spreadsheet View Styles */
 #spreadsheetView{display:none;flex-direction:column;align-items:center;width:100%;padding:12px;box-sizing:border-box}
 #spreadsheetView.active{display:flex}
 #spreadsheetContainer{width:100%;max-width:1075px;height:70vh;border:1px solid #ccc;border-radius:8px;overflow:hidden;background:#fff}
 #spreadsheetControls{display:flex;gap:12px;margin:12px 0;flex-wrap:wrap;justify-content:center;align-items:center}
 #spreadsheetControls button{padding:10px 16px;border:none;border-radius:8px;background:#1e88e5;color:#fff;font-size:16px;cursor:pointer}
 #spreadsheetSearch{margin-bottom:12px;padding:8px 12px;font-size:18px;border-radius:8px;border:1px solid #ccc;width:100%;max-width:1075px;box-sizing:border-box}
-/* Edit Pane */
 #editPane{position:fixed;top:0;right:-100%;width:100%;height:100%;background:#fff;z-index:60;transition:.25s ease;overflow-y:auto;display:flex;flex-direction:column}
-@media(min-width:900px){#editPane{width:50%;right:-50%;}}
+@media(min-width:900px){#editPane{width:50%;right:-50%}}
 #editPane.open{right:0}
 #editHeader{padding:16px;background:#1e88e5;color:#fff;font-size:18px;font-weight:600;display:flex;align-items:center}
 #editBackBtn{font-size:22px;margin-right:12px;cursor:pointer}
 #editTitle{flex:1}
 #saveEditBtn{padding:14px;border:none;border-radius:14px;background:#4caf50;color:#fff;font-size:16px;cursor:pointer;margin:20px auto;display:block;width:90%;max-width:400px}
-html, body {width:100%;height:100%;margin:0;padding:0;overflow-x:hidden;}
+html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
 </style>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css">
 <script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
-<!-- Google APIs -->
 <script src="https://apis.google.com/js/api.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -141,7 +98,6 @@ html, body {width:100%;height:100%;margin:0;padding:0;overflow-x:hidden;}
     </table>
   </div>
 </div>
-<!-- Spreadsheet View -->
 <div id="spreadsheetView">
   <input type="text" id="spreadsheetSearch" placeholder="Search all jobs in spreadsheet (any field)...">
   <div id="spreadsheetControls">
@@ -151,7 +107,6 @@ html, body {width:100%;height:100%;margin:0;padding:0;overflow-x:hidden;}
   </div>
   <div id="spreadsheetContainer"></div>
 </div>
-<!-- Detail Pane -->
 <div id="detailPane">
   <div id="detailHeader">
     <span id="backBtn">←</span>
@@ -182,7 +137,6 @@ html, body {width:100%;height:100%;margin:0;padding:0;overflow-x:hidden;}
     <textarea id="notes" placeholder="Notes"></textarea>
   </div>
 </div>
-<!-- Edit Pane -->
 <div id="editPane">
   <div id="editHeader">
     <span id="editBackBtn">←</span>
@@ -221,7 +175,7 @@ html, body {width:100%;height:100%;margin:0;padding:0;overflow-x:hidden;}
 </div>
 
 <script>
-// === GOOGLE SHEETS CONFIG ===
+// GOOGLE SHEETS CONFIG
 const SHEET_ID = '1HHigA2FLOc-R4s4nBKKmQb8cJo4hLdrVn5ACUA-HNjY';
 const API_KEY = 'AIzaSyAOMHM9t9e1VSLWJRMF683lwgu_4vmr65g';
 const CLIENT_ID = '1002184185824-06elg3bgd32qso2ckp7tpfbgeojri6r2.apps.googleusercontent.com';
@@ -233,7 +187,6 @@ let gapiInited = false;
 let gisInited = false;
 let authInProgress = false;
 
-// GAPI client init
 function gapiLoad() {
   gapi.load('client', async () => {
     try {
@@ -250,13 +203,12 @@ function gapiLoad() {
   });
 }
 
-// GIS OAuth init
 function gisLoaded() {
   try {
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
       scope: SCOPES,
-      callback: '', // set dynamically
+      callback: '',
     });
     gisInited = true;
     console.log('GIS initialized');
@@ -266,14 +218,12 @@ function gisLoaded() {
   }
 }
 
-// Check if APIs ready & auto-load
 function checkAndAutoLoad() {
   if (gapiInited && gisInited && !authInProgress) {
-    loadSheetData(true); // silent auto-load
+    loadSheetData(true);
   }
 }
 
-// Load from Sheet
 async function loadSheetData(silent = false) {
   if (!gapiInited) {
     if (!silent) alert('Google API not ready.');
@@ -331,7 +281,6 @@ async function loadSheetData(silent = false) {
   }
 }
 
-// Save to Sheet
 async function saveToSheet(silent = false) {
   if (authInProgress) return;
   authInProgress = true;
@@ -386,22 +335,19 @@ async function performSave(silent = false) {
   }
 }
 
-// Auto-save trigger (debounced 2s)
 let autoSaveTimeout;
 function triggerAutoSave() {
   clearTimeout(autoSaveTimeout);
   autoSaveTimeout = setTimeout(() => saveToSheet(true), 2000);
 }
 
-// Manual buttons
 document.getElementById('loadSheet').onclick = () => loadSheetData(false);
 document.getElementById('saveSheet').onclick = () => saveToSheet(false);
 
-// Init APIs
 gapiLoad();
 gisLoaded();
 
-// === YOUR BASELINE CODE ===
+// === BASELINE CODE ===
 const jobs = [];
 let activeJob = null;
 let currentMonth = new Date().getMonth();
@@ -410,7 +356,6 @@ const monthNames = ['January','February','March','April','May','June','July','Au
 const sortDirection = {};
 let previousJobList = [];
 
-// Utility functions
 function statusClass(v) {
   v = (v || 'TAB').toLowerCase();
   if (v === 'complete') return 'status-blue';
@@ -593,7 +538,7 @@ function saveEditPane() {
   openJob(activeJob);
 }
 
-// Robust CSV upload with SheetJS
+// ROBUST CSV IMPORT WITH SHEETJS (FIXES HOURS SHIFT)
 function triggerFileInput() {
   const input = document.createElement('input');
   input.type = 'file';
@@ -609,10 +554,8 @@ function triggerFileInput() {
         const workbook = XLSX.read(data, { type: file.name.endsWith('.csv') ? 'string' : 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        
-        // Convert sheet to array of arrays (header row + data)
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
-        
+
         if (jsonData.length < 1) {
           alert('Empty file.');
           return;
@@ -673,10 +616,10 @@ function triggerFileInput() {
         renderAll();
         triggerAutoSave();
 
-        alert('CSV/XLSX imported successfully!');
+        alert('Imported successfully!');
       } catch (err) {
         console.error('Import error:', err);
-        alert('Failed to import file: ' + (err.message || 'Unknown error'));
+        alert('Import failed: ' + (err.message || 'Unknown error'));
       }
     };
 
@@ -699,12 +642,14 @@ document.getElementById('triggerUpload').onclick = () => {
   triggerFileInput();
   document.getElementById('downloadModal').style.display = 'none';
 };
+
 // Swipe close
 let touchStartX = 0;
 detailPane.addEventListener('touchstart', e => touchStartX = e.touches[0].clientX);
 detailPane.addEventListener('touchmove', e => { if (e.touches[0].clientX - touchStartX > 100) detailPane.classList.remove('open'); });
 editPane.addEventListener('touchstart', e => touchStartX = e.touches[0].clientX);
 editPane.addEventListener('touchmove', e => { if (e.touches[0].clientX - touchStartX > 100) editPane.classList.remove('open'); });
+
 // Contact buttons
 document.getElementById('callPM').onclick = () => {
   if (activeJob && activeJob.pmNumber) {
@@ -789,6 +734,7 @@ Thank you,`;
     alert('No Client PM email available for this job. Please enter it in the spreadsheet view.');
   }
 };
+
 // Event listeners
 document.getElementById('prevMonth').onclick = () => { currentMonth--; if (currentMonth < 0) { currentMonth = 11; currentYear--; } renderAll(); };
 document.getElementById('nextMonth').onclick = () => { currentMonth++; if (currentMonth > 11) { currentMonth = 0; currentYear++; } renderAll(); };
@@ -815,14 +761,12 @@ function sortJobs(field) {
     return 0;
   });
 }
-// Render everything
 function renderAll() {
   renderCalendar();
   renderList();
   makeJobsDraggable();
   if (window.hot) updateSpreadsheetData();
 }
-// Spreadsheet code
 let hot = null;
 function getAllKeys() {
   if (jobs.length === 0) return [];
@@ -918,7 +862,6 @@ document.getElementById('addColumn').onclick = () => {
 };
 document.getElementById('spreadsheetSearch').addEventListener('input', () => updateSpreadsheetData());
 
-// Always render calendar on load (empty grid)
 renderAll();
 </script>
 </body>
