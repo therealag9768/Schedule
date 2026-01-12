@@ -13,15 +13,15 @@ header{padding:14px;background:#1e88e5;color:#fff;font-size:24px;font-weight:600
 #monthNav span{font-size:20px;font-weight:600}
 #weekdayHeader{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:6px;font-size:18px;font-weight:600;color:#555;width:90%}
 #weekdayHeader div{text-align:center}
-#calendarContainer{width:100%;max-width:1075px;overflow-x:auto;margin-bottom:12px}
-#calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;width:100%;padding:0;box-sizing:border-box}
-.calendar-day{background:#fff;border-radius:14px;padding:6px;display:flex;flex-direction:column;min-height:0;overflow:hidden;position:relative;height: 100%;box-sizing: border-box}
-.calendar-date{font-size:20px;font-weight:600;color:#444;margin-bottom:4px}
-.calendar-job{padding:4px 6px;border-radius:10px;font-size:22px;color:#fff;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;max-height:26px;line-height:26px}
-.calendar-more{font-size:14px;color:#666;margin-top:auto}
+#calendarContainer{width:100%;max-width:1075px;overflow-x:auto;margin-bottom:12px;min-height:400px}
+#calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;width:100%;padding:0;box-sizing:border-box;grid-auto-rows:1fr;min-height:60vh;height:auto}
+.calendar-day{background:#fff;border-radius:14px;padding:8px;display:flex;flex-direction:column;height:100%;min-height:120px;box-sizing:border-box;overflow:hidden;position:relative}
+.calendar-date{font-size:clamp(16px,3vw,20px);font-weight:600;color:#444;margin-bottom:6px}
+.calendar-job{padding:4px 6px;border-radius:10px;font-size:clamp(14px,2.5vw,18px);color:#fff;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;max-height:32px;line-height:32px}
+.calendar-more{font-size:clamp(12px,2vw,14px);color:#666;margin-top:auto;text-align:center}
 #jobTableContainer{width:100%;max-width:1075px;overflow-x:auto;margin-bottom:12px}
 #jobTable{width:100%;border-collapse:collapse}
-#jobTable th, #jobTable td{padding:8px;border:1px solid #ccc;text-align:left;font-size:22px}
+#jobTable th,#jobTable td{padding:8px;border:1px solid #ccc;text-align:left;font-size:22px}
 #jobTable th{cursor:pointer;background:#eee}
 .status-blue{background:#2196f3;color:#fff}
 .status-green{background:#00d27f;color:#fff}
@@ -29,7 +29,7 @@ header{padding:14px;background:#1e88e5;color:#fff;font-size:24px;font-weight:600
 .status-red{background:#ff5252;color:#fff}
 .status-standby{background:#d3d3d3;color:#000}
 #detailPane{position:fixed;top:0;right:-100%;width:100%;height:100%;background:#fff;z-index:50;transition:.25s ease;overflow-y:auto;touch-action:pan-y;display:flex;flex-direction:column}
-@media(min-width:900px){#detailPane{width:50%;right:-50%;}}
+@media(min-width:900px){#detailPane{width:50%;right:-50%}}
 #detailPane.open{right:0}
 #detailHeader{padding:16px;background:#1e88e5;color:#fff;font-size:18px;font-weight:600;display:flex;align-items:center;position:relative}
 #backBtn{font-size:22px;margin-right:12px;cursor:pointer}
@@ -175,7 +175,7 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
 </div>
 
 <script>
-// GOOGLE SHEETS CONFIG
+// === GOOGLE SHEETS CONFIG ===
 const SHEET_ID = '1HHigA2FLOc-R4s4nBKKmQb8cJo4hLdrVn5ACUA-HNjY';
 const API_KEY = 'AIzaSyAOMHM9t9e1VSLWJRMF683lwgu_4vmr65g';
 const CLIENT_ID = '1002184185824-06elg3bgd32qso2ckp7tpfbgeojri6r2.apps.googleusercontent.com';
@@ -538,7 +538,6 @@ function saveEditPane() {
   openJob(activeJob);
 }
 
-// ROBUST CSV IMPORT WITH SHEETJS (MATCHES YOUR AIRONE HEADERS)
 function triggerFileInput() {
   const input = document.createElement('input');
   input.type = 'file';
@@ -546,7 +545,6 @@ function triggerFileInput() {
   input.onchange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
@@ -555,24 +553,18 @@ function triggerFileInput() {
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
-
         if (jsonData.length < 1) {
           alert('Empty file.');
           return;
         }
-
         const headers = jsonData[0].map(h => (h || '').trim());
         const rows = jsonData.slice(1);
-
         rows.forEach(row => {
           const r = {};
           headers.forEach((h, i) => {
             r[h] = row[i] !== undefined ? String(row[i]).trim() : '';
           });
-
-          // Skip rows without key identifiers
           if (!r['Name'] && !r['Job Number']) return;
-
           let existing = jobs.find(j => j.name === r['Name'] && j.number === r['Job Number']);
           if (existing) {
             if ((existing.status || '') !== r['Field Ops']) {
@@ -580,7 +572,6 @@ function triggerFileInput() {
             }
             return;
           }
-
           let rawDate = r['Start Date'] || '';
           let parts = rawDate.split('/');
           if (parts.length === 3) {
@@ -588,7 +579,6 @@ function triggerFileInput() {
             parts[1] = parseInt(parts[1], 10).toString();
             rawDate = parts.join('/');
           }
-
           const newJob = {
             name: r['Name'] || '',
             number: r['Job Number'] || '',
@@ -596,34 +586,30 @@ function triggerFileInput() {
             scheduledDate: rawDate,
             status: r['Field Ops'] || 'TAB',
             fieldOps: r['Field Ops'] || 'TAB',
-            location: '', // Not in CSV - leave blank or map if needed
+            location: r['Location'] || '',
             customer: r['Customer'] || '',
             hours: r['Field Hours'] || '',
             clientProjectManager: r['Client Project Manager'] || '',
-            pmNumber: '', // Not in CSV
-            pmEmail: '', // Not in CSV
-            preConEmail: '', // Not in CSV
-            tbeEmail: '', // Not in CSV
+            pmNumber: r['PM Number'] || '',
+            pmEmail: r['PM Email'] || '',
+            preConEmail: r['Pre Con Email'] || '',
+            tbeEmail: r['TBE Email'] || '',
             notes: '',
             statusWarning: false,
             newJobFlag: previousJobList.length > 0 ? true : false
           };
-
           jobs.push(newJob);
         });
-
         previousJobList = jobs.map(j => ({name: j.name, number: j.number}));
         sortJobs('fieldOps');
         renderAll();
         triggerAutoSave();
-
-        alert('CSV/XLSX imported successfully!');
+        alert('Imported successfully!');
       } catch (err) {
         console.error('Import error:', err);
         alert('Import failed: ' + (err.message || 'Unknown error'));
       }
     };
-
     if (file.name.endsWith('.csv')) {
       reader.readAsText(file);
     } else {
@@ -867,4 +853,3 @@ renderAll();
 </script>
 </body>
 </html>
-
