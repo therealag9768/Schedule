@@ -45,6 +45,7 @@ textarea#notes{resize:none;overflow:hidden;min-height:100px}
 .contactSection{text-align:center}
 .contactButtons{display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap}
 .contactButtons button{@extend .detail-pane-button}
+.delete-job-btn {background:#d32f2f !important; color:#fff; margin-top:16px; font-weight:bold;}
 @media(max-width:768px){.btnGrid{grid-template-columns:1fr;gap:10px}.contactButtons{flex-direction:column;gap:10px}}
 #jobSearch{margin:12px 0;padding:8px 12px;font-size:18px;border-radius:8px;border:1px solid #ccc;width:100%;max-width:1075px;box-sizing:border-box}
 #spreadsheetView{display:none;flex-direction:column;align-items:center;width:100%;padding:12px;box-sizing:border-box}
@@ -60,6 +61,7 @@ textarea#notes{resize:none;overflow:hidden;min-height:100px}
 #editBackBtn{font-size:22px;margin-right:12px;cursor:pointer}
 #editTitle{flex:1}
 #saveEditBtn{padding:14px;border:none;border-radius:14px;background:#4caf50;color:#fff;font-size:16px;cursor:pointer;margin:20px auto;display:block;width:90%;max-width:400px}
+.sheet-link {color:#1e88e5; text-decoration:underline; font-weight:600; margin:12px 0; display:block; text-align:center;}
 html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
 </style>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
@@ -105,6 +107,9 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
     <button id="addRow">Add New Row</button>
     <button id="addColumn">Add New Column</button>
   </div>
+  <a href="https://docs.google.com/spreadsheets/d/1HHigA2FLOc-R4s4nBKKmQb8cJo4hLdrVn5ACUA-HNjY" target="_blank" class="sheet-link">
+    → Open this data directly in Google Sheets ←
+  </a>
   <div id="spreadsheetContainer"></div>
 </div>
 <div id="detailPane">
@@ -135,6 +140,9 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
   <div class="section">
     <label>Notes:</label>
     <textarea id="notes" placeholder="Notes"></textarea>
+  </div>
+  <div class="section">
+    <button id="deleteJobBtn" class="detail-pane-button delete-job-btn">Delete This Job</button>
   </div>
 </div>
 <div id="editPane">
@@ -181,12 +189,10 @@ const API_KEY = 'AIzaSyAOMHM9t9e1VSLWJRMF683lwgu_4vmr65g';
 const CLIENT_ID = '1002184185824-06elg3bgd32qso2ckp7tpfbgeojri6r2.apps.googleusercontent.com';
 const DISCOVERY_DOC = 'https://sheets.googleapis.com/$discovery/rest?version=v4';
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
-
 let tokenClient;
 let gapiInited = false;
 let gisInited = false;
 let authInProgress = false;
-
 function gapiLoad() {
   gapi.load('client', async () => {
     try {
@@ -202,7 +208,6 @@ function gapiLoad() {
     }
   });
 }
-
 function gisLoaded() {
   try {
     tokenClient = google.accounts.oauth2.initTokenClient({
@@ -217,13 +222,11 @@ function gisLoaded() {
     console.error('GIS error:', err);
   }
 }
-
 function checkAndAutoLoad() {
   if (gapiInited && gisInited && !authInProgress) {
     loadSheetData(true);
   }
 }
-
 async function loadSheetData(silent = false) {
   if (!gapiInited) {
     if (!silent) alert('Google API not ready.');
@@ -280,7 +283,6 @@ async function loadSheetData(silent = false) {
     if (!silent) alert('Load failed.');
   }
 }
-
 async function saveToSheet(silent = false) {
   if (authInProgress) return;
   authInProgress = true;
@@ -299,7 +301,6 @@ async function saveToSheet(silent = false) {
     authInProgress = false;
   }
 }
-
 async function performSave(silent = false) {
   try {
     const headers = ['Name','Job Number','Field Ops','Field Hours','Start Date','Scheduled Date','Customer','Client Project Manager','PM Number','PM Email','Location','Pre Con Email','TBE Email','Notes'];
@@ -334,16 +335,13 @@ async function performSave(silent = false) {
     if (!silent) alert('Save failed.');
   }
 }
-
 let autoSaveTimeout;
 function triggerAutoSave() {
   clearTimeout(autoSaveTimeout);
   autoSaveTimeout = setTimeout(() => saveToSheet(true), 2000);
 }
-
 document.getElementById('loadSheet').onclick = () => loadSheetData(false);
 document.getElementById('saveSheet').onclick = () => saveToSheet(false);
-
 gapiLoad();
 gisLoaded();
 
@@ -355,7 +353,6 @@ let currentYear = new Date().getFullYear();
 const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const sortDirection = {};
 let previousJobList = [];
-
 function statusClass(v) {
   v = (v || 'TAB').toLowerCase();
   if (v === 'complete') return 'status-blue';
@@ -473,6 +470,8 @@ function renderList(filteredJobs) {
     tbody.appendChild(tr);
   });
 }
+
+// ────────────── UPDATED openJob ──────────────
 function openJob(j) {
   activeJob = j;
   document.getElementById('detailTitle').textContent = `${j.name||'Unnamed'} ${j.number||''}`;
@@ -490,6 +489,7 @@ function openJob(j) {
   autoGrowNotes();
   detailPane.classList.add('open');
 }
+
 document.getElementById('notes').addEventListener('input', () => {
   if (activeJob) {
     activeJob.notes = document.getElementById('notes').value;
@@ -537,7 +537,6 @@ function saveEditPane() {
   triggerAutoSave();
   openJob(activeJob);
 }
-
 function triggerFileInput() {
   const input = document.createElement('input');
   input.type = 'file';
@@ -619,7 +618,6 @@ function triggerFileInput() {
   input.click();
 }
 document.getElementById('uploadCSV').onclick = triggerFileInput;
-
 // Download & modal
 document.getElementById('downloadAirOne').onclick = () => {
   window.open('https://airone.palmettoairbalance.com/project_management/projects/?_export=xls','_blank');
@@ -629,32 +627,30 @@ document.getElementById('triggerUpload').onclick = () => {
   triggerFileInput();
   document.getElementById('downloadModal').style.display = 'none';
 };
-
 // Swipe close
 let touchStartX = 0;
 detailPane.addEventListener('touchstart', e => touchStartX = e.touches[0].clientX);
 detailPane.addEventListener('touchmove', e => { if (e.touches[0].clientX - touchStartX > 100) detailPane.classList.remove('open'); });
 editPane.addEventListener('touchstart', e => touchStartX = e.touches[0].clientX);
 editPane.addEventListener('touchmove', e => { if (e.touches[0].clientX - touchStartX > 100) editPane.classList.remove('open'); });
-
 // Contact buttons
 document.getElementById('callPM').onclick = () => {
   if (activeJob && activeJob.pmNumber) {
-    window.location.href = `tel:${activeJob.pmNumber.replace(/[^\d+]/g, '')}`;
+    window.open(`tel:${activeJob.pmNumber.replace(/[^\d+]/g, '')}`, '_blank');
   } else {
     alert('No PM phone number available.');
   }
 };
 document.getElementById('emailPM').onclick = () => {
   if (activeJob && activeJob.pmEmail) {
-    window.location.href = `mailto:${activeJob.pmEmail}`;
+    window.open(`mailto:${activeJob.pmEmail}`, '_blank');
   } else {
     alert('No PM email available.');
   }
 };
 document.getElementById('textPM').onclick = () => {
   if (activeJob && activeJob.pmNumber) {
-    window.location.href = `sms:${activeJob.pmNumber.replace(/[^\d+]/g, '')}`;
+    window.open(`sms:${activeJob.pmNumber.replace(/[^\d+]/g, '')}`, '_blank');
   } else {
     alert('No PM phone number available for texting.');
   }
@@ -664,8 +660,9 @@ document.getElementById('copyJob').onclick = () => {
     navigator.clipboard.writeText(activeJob.number).then(() => alert(`Job number ${activeJob.number} copied!`)).catch(() => alert('Copy failed'));
   }
 };
-document.getElementById('openAir').onclick = () => window.open('https://airone.palmettoairbalance.com/project_management/projects/','_self');
-document.getElementById('airOneSchedule').onclick = () => window.open('https://airone.palmettoairbalance.com/scheduling/tech/','_self');
+// ────────────── UPDATED: all external links now use _blank ──────────────
+document.getElementById('openAir').onclick = () => window.open('https://airone.palmettoairbalance.com/project_management/projects/','_blank');
+document.getElementById('airOneSchedule').onclick = () => window.open('https://airone.palmettoairbalance.com/scheduling/tech/','_blank');
 document.getElementById('jobLocation').onclick = () => {
   if (activeJob) {
     const loc = activeJob.location || '';
@@ -689,7 +686,7 @@ document.getElementById('reportReady').onclick = () => {
 5.) Job has or does not have an engineer stamp. Guarantee ?
 Thank you,`;
   const mailtoLink = `mailto:${recipients ? encodeURIComponent(recipients) : ''}?cc=${encodeURIComponent(ccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  window.location.href = mailtoLink;
+  window.open(mailtoLink, '_blank');
 };
 document.getElementById('startEmail').onclick = () => {
   if (!activeJob) return;
@@ -716,9 +713,22 @@ Any important job requirements or information to help ensure a successful start 
 • If you do not respond to confirm the schedule, your project will not be scheduled.
 Thank you,`;
   if (pmEmail) {
-    window.location.href = `mailto:${encodeURIComponent(pmEmail)}?cc=${encodeURIComponent(ccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(`mailto:${encodeURIComponent(pmEmail)}?cc=${encodeURIComponent(ccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
   } else {
     alert('No Client PM email available for this job. Please enter it in the spreadsheet view.');
+  }
+};
+// ────────────── NEW: Delete job from detail pane ──────────────
+document.getElementById('deleteJobBtn').onclick = function() {
+  if (!activeJob) return;
+  if (!confirm(`Delete job "${activeJob.name || 'Unnamed'} ${activeJob.number || ''}" permanently?`)) return;
+  
+  const index = jobs.indexOf(activeJob);
+  if (index > -1) {
+    jobs.splice(index, 1);
+    document.getElementById('detailPane').classList.remove('open');
+    renderAll();
+    triggerAutoSave();
   }
 };
 
@@ -788,6 +798,29 @@ function initSpreadsheet() {
     licenseKey: 'non-commercial-and-evaluation',
     stretchH: 'all',
     fixedRowsTop: 1,
+    contextMenu: {
+      items: {
+        'delete_row': {
+          name: 'Delete this job (row)',
+          callback: function(key, selection) {
+            if (confirm('Are you sure you want to permanently delete this job row?')) {
+              const row = selection[0].start.row;
+              if (row === 0) return; // don't delete header
+              const filtered = getFilteredJobs(document.getElementById('spreadsheetSearch').value);
+              const job = filtered[row - 1];
+              if (job) {
+                const idx = jobs.indexOf(job);
+                if (idx !== -1) {
+                  jobs.splice(idx, 1);
+                  renderAll();
+                  triggerAutoSave();
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     cells: function(row, col) { if (row === 0) return { readOnly: true, className: 'htHeader' }; },
     afterChange: function(changes, source) {
       if (source === 'loadData' || !changes) return;
@@ -848,7 +881,6 @@ document.getElementById('addColumn').onclick = () => {
   triggerAutoSave();
 };
 document.getElementById('spreadsheetSearch').addEventListener('input', () => updateSpreadsheetData());
-
 renderAll();
 </script>
 </body>
