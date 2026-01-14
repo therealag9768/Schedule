@@ -11,9 +11,32 @@ header{padding:14px;background:#1e88e5;color:#fff;font-size:24px;font-weight:600
 #monthNav{display:flex;justify-content:space-between;align-items:center;width:90%;max-width:400px;margin-bottom:6px}
 #monthNav button{padding:6px 12px;font-size:16px;border:none;border-radius:6px;background:#1e88e5;color:#fff;cursor:pointer}
 #monthNav span{font-size:20px;font-weight:600}
-#weekdayHeader{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:6px;font-size:18px;font-weight:600;color:#555;width:90%}
-#weekdayHeader div{text-align:center}
-#calendarContainer{width:100%;max-width:1075px;overflow-x:auto;margin-bottom:12px;min-height:400px}
+
+/* ── Improved header alignment & scaling ── */
+#calendarHeaderWrapper {
+  width:100%;
+  max-width:1075px;
+  margin-bottom:6px;
+  overflow:hidden;
+}
+#weekdayHeader{
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:6px;
+  width:100%;
+  padding:0 3px;
+  box-sizing:border-box;
+  font-size:clamp(14px, 2.2vw, 18px);
+  font-weight:600;
+  color:#555;
+  text-align:center;
+  background:#f0f0f0;
+  border-radius:8px;
+  padding:8px 0;
+}
+#weekdayHeader div{text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+#calendarContainer{width:100%;max-width:1075px;overflow-x:auto;margin-bottom:12px;min-height:400px;scroll-behavior:smooth}
 #calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;width:100%;padding:0;box-sizing:border-box;grid-auto-rows:1fr;min-height:60vh;height:auto}
 .calendar-day{background:#fff;border-radius:14px;padding:8px;display:flex;flex-direction:column;height:100%;min-height:120px;box-sizing:border-box;overflow:hidden;position:relative}
 .calendar-date{font-size:clamp(16px,3vw,20px);font-weight:600;color:#444;margin-bottom:6px}
@@ -45,7 +68,7 @@ textarea#notes{resize:none;overflow:hidden;min-height:100px}
 .contactSection{text-align:center}
 .contactButtons{display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap}
 .contactButtons button{@extend .detail-pane-button}
-.delete-job-btn {background:#d32f2f !important; color:#fff; margin-top:16px; font-weight:bold;}
+.delete-job-btn{background:#d32f2f !important;color:#fff;margin-top:16px;font-weight:bold;}
 @media(max-width:768px){.btnGrid{grid-template-columns:1fr;gap:10px}.contactButtons{flex-direction:column;gap:10px}}
 #jobSearch{margin:12px 0;padding:8px 12px;font-size:18px;border-radius:8px;border:1px solid #ccc;width:100%;max-width:1075px;box-sizing:border-box}
 #spreadsheetView{display:none;flex-direction:column;align-items:center;width:100%;padding:12px;box-sizing:border-box}
@@ -61,7 +84,7 @@ textarea#notes{resize:none;overflow:hidden;min-height:100px}
 #editBackBtn{font-size:22px;margin-right:12px;cursor:pointer}
 #editTitle{flex:1}
 #saveEditBtn{padding:14px;border:none;border-radius:14px;background:#4caf50;color:#fff;font-size:16px;cursor:pointer;margin:20px auto;display:block;width:90%;max-width:400px}
-.sheet-link {color:#1e88e5; text-decoration:underline; font-weight:600; margin:12px 0; display:block; text-align:center;}
+.sheet-link{color:#1e88e5;text-decoration:underline;font-weight:600;margin:12px 0;display:block;text-align:center;}
 html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
 </style>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
@@ -74,7 +97,9 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
 <header>Schedule App</header>
 <div id="app">
   <div id="monthNav"><button id="prevMonth">‹</button><span id="currentMonthLabel"></span><button id="nextMonth">›</button></div>
-  <div id="weekdayHeader"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
+  <div id="calendarHeaderWrapper">
+    <div id="weekdayHeader"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
+  </div>
   <div id="calendarContainer"><div id="calendar"></div></div>
   <input type="text" id="jobSearch" placeholder="Search jobs by name, number, or customer...">
   <div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;justify-content:center">
@@ -470,8 +495,6 @@ function renderList(filteredJobs) {
     tbody.appendChild(tr);
   });
 }
-
-// ────────────── UPDATED openJob ──────────────
 function openJob(j) {
   activeJob = j;
   document.getElementById('detailTitle').textContent = `${j.name||'Unnamed'} ${j.number||''}`;
@@ -489,7 +512,6 @@ function openJob(j) {
   autoGrowNotes();
   detailPane.classList.add('open');
 }
-
 document.getElementById('notes').addEventListener('input', () => {
   if (activeJob) {
     activeJob.notes = document.getElementById('notes').value;
@@ -636,21 +658,21 @@ editPane.addEventListener('touchmove', e => { if (e.touches[0].clientX - touchSt
 // Contact buttons
 document.getElementById('callPM').onclick = () => {
   if (activeJob && activeJob.pmNumber) {
-    window.open(`tel:${activeJob.pmNumber.replace(/[^\d+]/g, '')}`, '_blank');
+    window.open(`tel:${activeJob.pmNumber.replace(/[^\d+]/g, '')}`,'_blank');
   } else {
     alert('No PM phone number available.');
   }
 };
 document.getElementById('emailPM').onclick = () => {
   if (activeJob && activeJob.pmEmail) {
-    window.open(`mailto:${activeJob.pmEmail}`, '_blank');
+    window.open(`mailto:${activeJob.pmEmail}`,'_blank');
   } else {
     alert('No PM email available.');
   }
 };
 document.getElementById('textPM').onclick = () => {
   if (activeJob && activeJob.pmNumber) {
-    window.open(`sms:${activeJob.pmNumber.replace(/[^\d+]/g, '')}`, '_blank');
+    window.open(`sms:${activeJob.pmNumber.replace(/[^\d+]/g, '')}`,'_blank');
   } else {
     alert('No PM phone number available for texting.');
   }
@@ -660,7 +682,6 @@ document.getElementById('copyJob').onclick = () => {
     navigator.clipboard.writeText(activeJob.number).then(() => alert(`Job number ${activeJob.number} copied!`)).catch(() => alert('Copy failed'));
   }
 };
-// ────────────── UPDATED: all external links now use _blank ──────────────
 document.getElementById('openAir').onclick = () => window.open('https://airone.palmettoairbalance.com/project_management/projects/','_blank');
 document.getElementById('airOneSchedule').onclick = () => window.open('https://airone.palmettoairbalance.com/scheduling/tech/','_blank');
 document.getElementById('jobLocation').onclick = () => {
@@ -718,7 +739,7 @@ Thank you,`;
     alert('No Client PM email available for this job. Please enter it in the spreadsheet view.');
   }
 };
-// ────────────── NEW: Delete job from detail pane ──────────────
+// Delete job from detail pane
 document.getElementById('deleteJobBtn').onclick = function() {
   if (!activeJob) return;
   if (!confirm(`Delete job "${activeJob.name || 'Unnamed'} ${activeJob.number || ''}" permanently?`)) return;
@@ -731,7 +752,6 @@ document.getElementById('deleteJobBtn').onclick = function() {
     triggerAutoSave();
   }
 };
-
 // Event listeners
 document.getElementById('prevMonth').onclick = () => { currentMonth--; if (currentMonth < 0) { currentMonth = 11; currentYear--; } renderAll(); };
 document.getElementById('nextMonth').onclick = () => { currentMonth++; if (currentMonth > 11) { currentMonth = 0; currentYear++; } renderAll(); };
@@ -803,25 +823,37 @@ function initSpreadsheet() {
         'delete_row': {
           name: 'Delete this job (row)',
           callback: function(key, selection) {
-            if (confirm('Are you sure you want to permanently delete this job row?')) {
-              const row = selection[0].start.row;
-              if (row === 0) return; // don't delete header
-              const filtered = getFilteredJobs(document.getElementById('spreadsheetSearch').value);
-              const job = filtered[row - 1];
-              if (job) {
-                const idx = jobs.indexOf(job);
-                if (idx !== -1) {
-                  jobs.splice(idx, 1);
-                  renderAll();
-                  triggerAutoSave();
-                }
-              }
+            if (!confirm('Are you sure you want to permanently delete this job row?')) return;
+
+            const visualRow = selection[0].start.row;
+            if (visualRow === 0) return; // header
+
+            const filtered = getFilteredJobs(document.getElementById('spreadsheetSearch').value);
+            const jobToDelete = filtered[visualRow - 1];
+            if (!jobToDelete) return;
+
+            const realIndex = jobs.indexOf(jobToDelete);
+            if (realIndex !== -1) {
+              jobs.splice(realIndex, 1);
             }
+
+            // Force refresh — this removes the row visually
+            updateSpreadsheetData();
+
+            if (activeJob === jobToDelete) {
+              document.getElementById('detailPane').classList.remove('open');
+              activeJob = null;
+            }
+
+            renderAll();
+            triggerAutoSave();
           }
         }
       }
     },
-    cells: function(row, col) { if (row === 0) return { readOnly: true, className: 'htHeader' }; },
+    cells: function(row, col) { 
+      if (row === 0) return { readOnly: true, className: 'htHeader' }; 
+    },
     afterChange: function(changes, source) {
       if (source === 'loadData' || !changes) return;
       changes.forEach(([row, prop, oldVal, newVal]) => {
