@@ -204,7 +204,7 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
     <input type="text" id="newPmEmail" placeholder="Email address">
   </div>
 
-  <!-- Light blue background - select from existing (all show PM names) -->
+  <!-- Light blue background - PM name selection (all dropdowns show names only) -->
   <div class="section" style="background:#e3f2fd; border-radius:12px; margin:12px; padding:16px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
     <div style="margin-bottom:12px; font-weight:600;">Select from Existing</div>
 
@@ -214,10 +214,10 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
     <label>Client Project Manager</label>
     <select id="editClientProjectManager"></select>
 
-    <label>PM Number</label>
+    <label>PM Number (select name)</label>
     <select id="editPmNumber"></select>
 
-    <label>PM Email</label>
+    <label>PM Email (select name)</label>
     <select id="editPmEmail"></select>
   </div>
 
@@ -610,7 +610,7 @@ function openEditPane() {
   populateSelect('editCustomer', 'customer');
   document.getElementById('editCustomer').value = activeJob.customer || '';
 
-  // PM dropdowns - all show names from Contacts
+  // PM name dropdowns - all identical, showing names from Contacts
   const pmDropdowns = ['editClientProjectManager', 'editPmNumber', 'editPmEmail'];
   const pmNames = [...new Set(contacts.map(c => c['Client Project Manager'] || '').filter(Boolean))].sort();
 
@@ -626,16 +626,6 @@ function openEditPane() {
     select.value = activeJob.clientProjectManager || '';
   });
 
-  // Auto-fill number & email based on current PM name
-  const currentPM = activeJob.clientProjectManager || '';
-  if (currentPM) {
-    const contact = contacts.find(c => c['Client Project Manager'] === currentPM);
-    if (contact) {
-      document.getElementById('editPmNumber').value = contact['PM Number'] || '';
-      document.getElementById('editPmEmail').value = contact['PM Email'] || '';
-    }
-  }
-
   // Dark section - manual overrides
   document.getElementById('newCustomer').value = '';
   document.getElementById('newClientProjectManager').value = '';
@@ -644,45 +634,6 @@ function openEditPane() {
 
   editPane.classList.add('open');
 }
-
-// Sync all PM dropdowns and auto-fill when any changes
-function setupPMSync() {
-  const pmDropdowns = ['editClientProjectManager', 'editPmNumber', 'editPmEmail'];
-
-  pmDropdowns.forEach(id => {
-    const select = document.getElementById(id);
-    if (select) {
-      select.addEventListener('change', (e) => {
-        const selectedName = e.target.value.trim();
-        if (!selectedName) {
-          pmDropdowns.forEach(d => document.getElementById(d).value = '');
-          document.getElementById('editPmNumber').value = '';
-          document.getElementById('editPmEmail').value = '';
-          return;
-        }
-
-        // Sync all dropdowns to the same name
-        pmDropdowns.forEach(d => {
-          document.getElementById(d).value = selectedName;
-        });
-
-        // Auto-fill number & email from Contacts
-        const contact = contacts.find(c => c['Client Project Manager'] === selectedName);
-        if (contact) {
-          document.getElementById('editPmNumber').value = contact['PM Number'] || '';
-          document.getElementById('editPmEmail').value = contact['PM Email'] || '';
-        } else {
-          document.getElementById('editPmNumber').value = '';
-          document.getElementById('editPmEmail').value = '';
-        }
-      });
-    }
-  });
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  setupPMSync();
-});
 
 function saveEditPane() {
   if (!activeJob) return;
@@ -701,13 +652,14 @@ function saveEditPane() {
   const customer = document.getElementById('editCustomer').value.trim();
   if (customer) activeJob.customer = customer;
 
+  // PM name comes from the main dropdown (or any - they are independent)
   const pmName = document.getElementById('editClientProjectManager').value.trim();
   if (pmName) activeJob.clientProjectManager = pmName;
 
-  activeJob.pmNumber = document.getElementById('editPmNumber').value.trim() || activeJob.pmNumber;
-  activeJob.pmEmail = document.getElementById('editPmEmail').value.trim() || activeJob.pmEmail;
+  // Number & email are NOT auto-filled - only set if manually entered
+  // (they remain blank unless user types in dark section)
 
-  // Manual overrides
+  // Manual overrides (highest priority)
   const manualCustomer = document.getElementById('newCustomer').value.trim();
   if (manualCustomer) activeJob.customer = manualCustomer;
 
