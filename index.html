@@ -204,7 +204,7 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
     <input type="text" id="newPmEmail" placeholder="Email address">
   </div>
 
-  <!-- Light blue background - PM name selection (all dropdowns show names only) -->
+  <!-- Light blue background - PM name selection with auto-fill -->
   <div class="section" style="background:#e3f2fd; border-radius:12px; margin:12px; padding:16px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
     <div style="margin-bottom:12px; font-weight:600;">Select from Existing</div>
 
@@ -295,12 +295,17 @@ async function loadSheetData(silent = false) {
       return;
     }
     const headers = rows[0].map(h => h ? h.trim() : '');
+    const seenNumbers = new Set(); // NEW: Prevent duplicates on load
     jobs.length = 0;
     for (let i = 1; i < rows.length; i++) {
       const r = {};
       headers.forEach((h, idx) => {
         r[h] = rows[i][idx] !== undefined ? String(rows[i][idx]).trim() : '';
       });
+      const jobNumber = r['Job Number'] || '';
+      if (jobNumber && seenNumbers.has(jobNumber)) continue; // Skip duplicate job number
+      seenNumbers.add(jobNumber);
+
       let rawDate = r['Start Date'] || '';
       let parts = rawDate.split('/');
       if (parts.length === 3) {
@@ -310,7 +315,7 @@ async function loadSheetData(silent = false) {
       }
       jobs.push({
         name: r['Name'] || '',
-        number: r['Job Number'] || '',
+        number: jobNumber,
         startDate: rawDate,
         scheduledDate: r['Scheduled Date'] || rawDate,
         status: r['Field Ops'] || 'TAB',
@@ -516,6 +521,12 @@ document.addEventListener('click', e => {
     const jobName = prompt('Enter Job Name:');
     if (!jobName) return;
     const jobNumber = prompt('Enter Job Number:') || '';
+    if (!jobNumber) return; // Require job number
+    // NEW: Check for duplicate job number
+    if (jobs.some(j => j.number === jobNumber)) {
+      alert(`Job with number ${jobNumber} already exists!`);
+      return;
+    }
     const customer = prompt('Enter Customer:') || '';
     jobs.push({
       name: jobName,
@@ -610,7 +621,7 @@ function openEditPane() {
   populateSelect('editCustomer', 'customer');
   document.getElementById('editCustomer').value = activeJob.customer || '';
 
-  // PM name dropdowns - all identical, showing names from Contacts
+  // PM name dropdowns - all show names from Contacts
   const pmDropdowns = ['editClientProjectManager', 'editPmNumber', 'editPmEmail'];
   const pmNames = [...new Set(contacts.map(c => c['Client Project Manager'] || '').filter(Boolean))].sort();
 
@@ -635,6 +646,40 @@ function openEditPane() {
   editPane.classList.add('open');
 }
 
+// Sync dropdowns and auto-fill number/email when any PM name is selected
+function setupPMSync() {
+  const pmDropdowns = ['editClientProjectManager', 'editPmNumber', 'editPmEmail'];
+
+  pmDropdowns.forEach(id => {
+    const select = document.getElementById(id);
+    if (select) {
+      select.addEventListener('change', (e) => {
+        const selectedName = e.target.value.trim();
+        if (!selectedName) {
+          pmDropdowns.forEach(d => document.getElementById(d).value = '');
+          return;
+        }
+
+        // Sync all dropdowns to the selected name
+        pmDropdowns.forEach(d => {
+          document.getElementById(d).value = selectedName;
+        });
+
+        // Auto-fill number & email from Contacts
+        const contact = contacts.find(c => c['Client Project Manager'] === selectedName);
+        if (contact) {
+          document.getElementById('editPmNumber').value = contact['PM Number'] || '';
+          document.getElementById('editPmEmail').value = contact['PM Email'] || '';
+        }
+      });
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setupPMSync();
+});
+
 function saveEditPane() {
   if (!activeJob) return;
 
@@ -652,12 +697,12 @@ function saveEditPane() {
   const customer = document.getElementById('editCustomer').value.trim();
   if (customer) activeJob.customer = customer;
 
-  // PM name comes from the main dropdown (or any - they are independent)
   const pmName = document.getElementById('editClientProjectManager').value.trim();
   if (pmName) activeJob.clientProjectManager = pmName;
 
-  // Number & email are NOT auto-filled - only set if manually entered
-  // (they remain blank unless user types in dark section)
+  // Auto-filled or manual values
+  activeJob.pmNumber = document.getElementById('editPmNumber').value.trim() || activeJob.pmNumber;
+  activeJob.pmEmail = document.getElementById('editPmEmail').value.trim() || activeJob.pmEmail;
 
   // Manual overrides (highest priority)
   const manualCustomer = document.getElementById('newCustomer').value.trim();
@@ -704,8 +749,10 @@ function triggerFileInput() {
             r[h] = row[i] !== undefined ? String(row[i]).trim() : '';
           });
           if (!r['Name'] && !r['Job Number']) return;
-          let existing = jobs.find(j => j.name === r['Name'] && j.number === r['Job Number']);
-          if (existing) {
+          const jobNumber = r['Job Number'] || '';
+          if (jobNumber && jobs.some(j => j.number === jobNumber)) {
+            // Already exists - update status warning if needed
+            const existing = jobs.find(j => j.number === jobNumber);
             if ((existing.status || '') !== r['Field Ops']) {
               existing.statusWarning = true;
             }
@@ -720,7 +767,7 @@ function triggerFileInput() {
           }
           const newJob = {
             name: r['Name'] || '',
-            number: r['Job Number'] || '',
+            number: jobNumber,
             startDate: rawDate,
             scheduledDate: rawDate,
             status: r['Field Ops'] || 'TAB',
