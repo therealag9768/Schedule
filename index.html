@@ -215,10 +215,10 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
     <select id="editClientProjectManager"></select>
 
     <label>PM Number</label>
-    <select id="editPmNumber"></select>
+    <input type="text" id="editPmNumber" readonly placeholder="Auto-filled from PM name">
 
     <label>PM Email</label>
-    <select id="editPmEmail"></select>
+    <input type="text" id="editPmEmail" readonly placeholder="Auto-filled from PM name">
   </div>
 
   <button id="saveEditBtn">Save Changes</button>
@@ -576,14 +576,21 @@ function openEditPane() {
   // Light blue section - dropdowns
   populateSelect('editCustomer', 'customer');
   populateSelect('editClientProjectManager', 'clientProjectManager');
-  populateSelect('editPmNumber', 'pmNumber');
-  populateSelect('editPmEmail', 'pmEmail');
+
   document.getElementById('editCustomer').value = activeJob.customer || '';
   document.getElementById('editClientProjectManager').value = activeJob.clientProjectManager || '';
-  document.getElementById('editPmNumber').value = activeJob.pmNumber || '';
-  document.getElementById('editPmEmail').value = activeJob.pmEmail || '';
 
-  // Dark section - manual overrides start empty
+  // Auto-fill PM Number & Email based on current PM name
+  const selectedPM = activeJob.clientProjectManager || '';
+  if (selectedPM) {
+    const matching = jobs.filter(j => j.clientProjectManager === selectedPM);
+    if (matching.length > 0) {
+      document.getElementById('editPmNumber').value = matching[0].pmNumber || '';
+      document.getElementById('editPmEmail').value = matching[0].pmEmail || '';
+    }
+  }
+
+  // Dark section - start empty
   document.getElementById('newCustomer').value = '';
   document.getElementById('newClientProjectManager').value = '';
   document.getElementById('newPmNumber').value = '';
@@ -591,6 +598,32 @@ function openEditPane() {
 
   editPane.classList.add('open');
 }
+
+// Auto-fill PM Number & Email when PM name changes
+document.addEventListener('DOMContentLoaded', () => {
+  const pmSelect = document.getElementById('editClientProjectManager');
+  if (pmSelect) {
+    pmSelect.addEventListener('change', (e) => {
+      const selectedName = e.target.value.trim();
+      if (!selectedName) {
+        document.getElementById('editPmNumber').value = '';
+        document.getElementById('editPmEmail').value = '';
+        return;
+      }
+
+      const matching = jobs.filter(j => j.clientProjectManager === selectedName);
+      if (matching.length > 0) {
+        // Use first match (you can improve this later if needed)
+        document.getElementById('editPmNumber').value = matching[0].pmNumber || '';
+        document.getElementById('editPmEmail').value = matching[0].pmEmail || '';
+      } else {
+        document.getElementById('editPmNumber').value = '';
+        document.getElementById('editPmEmail').value = '';
+      }
+    });
+  }
+});
+
 function saveEditPane() {
   if (!activeJob) return;
 
@@ -606,13 +639,15 @@ function saveEditPane() {
   activeJob.preConEmail = document.getElementById('editPreConEmail').value || activeJob.preConEmail;
   activeJob.tbeEmail = document.getElementById('editTbeEmail').value || activeJob.tbeEmail;
 
-  // Light blue dropdowns - only if selected (lower priority)
+  // Light blue dropdowns
   const customer = document.getElementById('editCustomer').value.trim();
   if (customer) activeJob.customer = customer;
 
   const pmName = document.getElementById('editClientProjectManager').value.trim();
   if (pmName) activeJob.clientProjectManager = pmName;
 
+  // PM Number & Email are auto-filled from PM name selection
+  // But still allow override from dark section or direct edit
   const pmNumber = document.getElementById('editPmNumber').value.trim();
   if (pmNumber) activeJob.pmNumber = pmNumber;
 
@@ -827,7 +862,7 @@ document.getElementById('deleteJobBtn').onclick = function() {
   }
 };
 document.getElementById('prevMonth').onclick = () => { currentMonth--; if (currentMonth < 0) { currentMonth = 11; currentYear--; } renderAll(); };
-document.getElementById('nextMonth').onclick = () => { currentMonth++; if (currentMonth > 11) { currentMonth = 0; currentYear--; } renderAll(); };
+document.getElementById('nextMonth').onclick = () => { currentMonth++; if (currentMonth > 11) { currentMonth = 0; currentYear++; } renderAll(); };
 document.getElementById('backBtn').onclick = () => detailPane.classList.remove('open');
 document.getElementById('editBtn').onclick = openEditPane;
 document.getElementById('editBackBtn').onclick = () => editPane.classList.remove('open');
