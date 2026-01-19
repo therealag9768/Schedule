@@ -204,7 +204,7 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
     <input type="text" id="newPmEmail" placeholder="Email address">
   </div>
 
-  <!-- Light blue background - PM name selection with auto-fill -->
+  <!-- Light blue background - select from existing -->
   <div class="section" style="background:#e3f2fd; border-radius:12px; margin:12px; padding:16px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
     <div style="margin-bottom:12px; font-weight:600;">Select from Existing</div>
 
@@ -214,10 +214,10 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
     <label>Client Project Manager</label>
     <select id="editClientProjectManager"></select>
 
-    <label>PM Number (select name)</label>
+    <label>PM Number</label>
     <select id="editPmNumber"></select>
 
-    <label>PM Email (select name)</label>
+    <label>PM Email</label>
     <select id="editPmEmail"></select>
   </div>
 
@@ -295,7 +295,7 @@ async function loadSheetData(silent = false) {
       return;
     }
     const headers = rows[0].map(h => h ? h.trim() : '');
-    const seenNumbers = new Set(); // NEW: Prevent duplicates on load
+    const seenNumbers = new Set();
     jobs.length = 0;
     for (let i = 1; i < rows.length; i++) {
       const r = {};
@@ -303,9 +303,8 @@ async function loadSheetData(silent = false) {
         r[h] = rows[i][idx] !== undefined ? String(rows[i][idx]).trim() : '';
       });
       const jobNumber = r['Job Number'] || '';
-      if (jobNumber && seenNumbers.has(jobNumber)) continue; // Skip duplicate job number
+      if (jobNumber && seenNumbers.has(jobNumber)) continue; 
       seenNumbers.add(jobNumber);
-
       let rawDate = r['Start Date'] || '';
       let parts = rawDate.split('/');
       if (parts.length === 3) {
@@ -523,7 +522,7 @@ document.addEventListener('click', e => {
     const jobNumber = prompt('Enter Job Number:') || '';
     if (!jobNumber) return; // Require job number
     // NEW: Check for duplicate job number
-    if (jobs.some(j => j.number === jobNumber)) {
+    if (jobs.some(j => j.number === jobNumber) ) {
       alert(`Job with number ${jobNumber} already exists!`);
       return;
     }
