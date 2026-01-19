@@ -11,31 +11,9 @@ header{padding:14px;background:#1e88e5;color:#fff;font-size:24px;font-weight:600
 #monthNav{display:flex;justify-content:space-between;align-items:center;width:90%;max-width:400px;margin-bottom:6px}
 #monthNav button{padding:6px 12px;font-size:16px;border:none;border-radius:6px;background:#1e88e5;color:#fff;cursor:pointer}
 #monthNav span{font-size:20px;font-weight:600}
-
-/* ── Improved header alignment & scaling ── */
-#calendarHeaderWrapper {
-  width:100%;
-  max-width:1075px;
-  margin-bottom:6px;
-  overflow:hidden;
-}
-#weekdayHeader{
-  display:grid;
-  grid-template-columns:repeat(7,1fr);
-  gap:6px;
-  width:100%;
-  padding:0 3px;
-  box-sizing:border-box;
-  font-size:clamp(14px, 2.2vw, 18px);
-  font-weight:600;
-  color:#555;
-  text-align:center;
-  background:#f0f0f0;
-  border-radius:8px;
-  padding:8px 0;
-}
+#calendarHeaderWrapper{width:100%;max-width:1075px;margin-bottom:6px;overflow:hidden}
+#weekdayHeader{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;width:100%;padding:0 3px;box-sizing:border-box;font-size:clamp(14px,2.2vw,18px);font-weight:600;color:#555;text-align:center;background:#f0f0f0;border-radius:8px;padding:8px 0}
 #weekdayHeader div{text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-
 #calendarContainer{width:100%;max-width:1075px;overflow-x:auto;margin-bottom:12px;min-height:400px;scroll-behavior:smooth}
 #calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;width:100%;padding:0;box-sizing:border-box;grid-auto-rows:1fr;min-height:60vh;height:auto}
 .calendar-day{background:#fff;border-radius:14px;padding:8px;display:flex;flex-direction:column;height:100%;min-height:120px;box-sizing:border-box;overflow:hidden;position:relative}
@@ -175,29 +153,74 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
     <span id="editBackBtn">←</span>
     <span id="editTitle">Edit Job</span>
   </div>
-  <div class="section">
+
+  <!-- White background - main fields -->
+  <div class="section" style="background:white; border-radius:12px; margin:12px; padding:16px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+    <label>Field Ops</label>
+    <select id="editFieldOps">
+      <option value="Complete">Complete</option>
+      <option value="Field Ready">Field Ready</option>
+      <option value="Standby">Standby</option>
+      <option value="Stalled">Stalled</option>
+      <option value="TAB">TAB</option>
+    </select>
+
+    <label>Name</label>
+    <input type="text" id="editName" placeholder="Job Name">
+
+    <label>Job Number</label>
+    <input type="text" id="editNumber" placeholder="Job Number">
+
     <label>Location</label>
-    <select id="editLocation"></select>
-    <input type="text" id="newLocation" placeholder="Or enter new location">
-    <label>Customer</label>
-    <select id="editCustomer"></select>
-    <input type="text" id="newCustomer" placeholder="Or enter new customer">
-    <label>Client Project Manager</label>
-    <select id="editClientProjectManager"></select>
-    <input type="text" id="newClientProjectManager" placeholder="Or enter new PM name">
-    <label>PM Email</label>
-    <select id="editPmEmail"></select>
-    <input type="text" id="newPmEmail" placeholder="Or enter new PM email">
-    <label>PM Number</label>
-    <select id="editPmNumber"></select>
-    <input type="text" id="newPmNumber" placeholder="Or enter new PM number">
+    <input type="text" id="editLocation" placeholder="Location">
+
+    <label>Field Hours</label>
+    <input type="text" id="editHours" placeholder="Field Hours">
+
+    <label>Start Date</label>
+    <input type="text" id="editStartDate" placeholder="MM/DD/YYYY">
+
     <label>Pre Con Email</label>
     <select id="editPreConEmail"></select>
-    <input type="text" id="newPreConEmail" placeholder="Or enter new Pre Con email">
+
     <label>TBE Email</label>
     <select id="editTbeEmail"></select>
-    <input type="text" id="newTbeEmail" placeholder="Or enter new TBE email">
   </div>
+
+  <!-- Dark background - manual entry overrides -->
+  <div class="section" style="background:#2c2c2c; color:#eee; border-radius:12px; margin:12px; padding:16px; box-shadow:0 2px 8px rgba(0,0,0,0.3);">
+    <div style="margin-bottom:12px; font-weight:600;">Manual Entry (override)</div>
+
+    <label>Customer</label>
+    <input type="text" id="newCustomer" placeholder="Customer name">
+
+    <label>Client Project Manager</label>
+    <input type="text" id="newClientProjectManager" placeholder="PM Name">
+
+    <label>PM Number</label>
+    <input type="text" id="newPmNumber" placeholder="Phone number">
+
+    <label>PM Email</label>
+    <input type="text" id="newPmEmail" placeholder="Email address">
+  </div>
+
+  <!-- Light blue background - select from existing -->
+  <div class="section" style="background:#e3f2fd; border-radius:12px; margin:12px; padding:16px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+    <div style="margin-bottom:12px; font-weight:600;">Select from Existing</div>
+
+    <label>Customer</label>
+    <select id="editCustomer"></select>
+
+    <label>Client Project Manager</label>
+    <select id="editClientProjectManager"></select>
+
+    <label>PM Number</label>
+    <select id="editPmNumber"></select>
+
+    <label>PM Email</label>
+    <select id="editPmEmail"></select>
+  </div>
+
   <button id="saveEditBtn">Save Changes</button>
 </div>
 <div id="downloadModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;z-index:100">
@@ -535,25 +558,80 @@ function populateSelect(id, field) {
 function openEditPane() {
   if (!activeJob) return;
   document.getElementById('editTitle').textContent = `Edit: ${activeJob.name || 'Job'}`;
-  const fields = ['location', 'customer', 'clientProjectManager', 'pmEmail', 'pmNumber', 'preConEmail', 'tbeEmail'];
-  fields.forEach(field => {
-    const selectId = 'edit' + field.charAt(0).toUpperCase() + field.slice(1);
-    const inputId = 'new' + field.charAt(0).toUpperCase() + field.slice(1);
-    populateSelect(selectId, field);
-    document.getElementById(selectId).value = activeJob[field] || '';
-    document.getElementById(inputId).value = '';
-  });
+
+  // White section - main fields
+  document.getElementById('editFieldOps').value = activeJob.fieldOps || 'TAB';
+  document.getElementById('editName').value = activeJob.name || '';
+  document.getElementById('editNumber').value = activeJob.number || '';
+  document.getElementById('editLocation').value = activeJob.location || '';
+  document.getElementById('editHours').value = activeJob.hours || '';
+  document.getElementById('editStartDate').value = activeJob.startDate || '';
+
+  // Dropdowns in white section
+  populateSelect('editPreConEmail', 'preConEmail');
+  populateSelect('editTbeEmail', 'tbeEmail');
+  document.getElementById('editPreConEmail').value = activeJob.preConEmail || '';
+  document.getElementById('editTbeEmail').value = activeJob.tbeEmail || '';
+
+  // Light blue section - dropdowns
+  populateSelect('editCustomer', 'customer');
+  populateSelect('editClientProjectManager', 'clientProjectManager');
+  populateSelect('editPmNumber', 'pmNumber');
+  populateSelect('editPmEmail', 'pmEmail');
+  document.getElementById('editCustomer').value = activeJob.customer || '';
+  document.getElementById('editClientProjectManager').value = activeJob.clientProjectManager || '';
+  document.getElementById('editPmNumber').value = activeJob.pmNumber || '';
+  document.getElementById('editPmEmail').value = activeJob.pmEmail || '';
+
+  // Dark section - manual overrides start empty
+  document.getElementById('newCustomer').value = '';
+  document.getElementById('newClientProjectManager').value = '';
+  document.getElementById('newPmNumber').value = '';
+  document.getElementById('newPmEmail').value = '';
+
   editPane.classList.add('open');
 }
 function saveEditPane() {
   if (!activeJob) return;
-  const fields = ['location', 'customer', 'clientProjectManager', 'pmEmail', 'pmNumber', 'preConEmail', 'tbeEmail'];
-  fields.forEach(field => {
-    const selectId = 'edit' + field.charAt(0).toUpperCase() + field.slice(1);
-    const inputId = 'new' + field.charAt(0).toUpperCase() + field.slice(1);
-    const value = document.getElementById(inputId).value.trim() || document.getElementById(selectId).value;
-    if (value) activeJob[field] = value;
-  });
+
+  // White section - direct fields
+  activeJob.fieldOps = document.getElementById('editFieldOps').value || activeJob.fieldOps;
+  activeJob.status = activeJob.fieldOps;
+  activeJob.name = document.getElementById('editName').value.trim() || activeJob.name;
+  activeJob.number = document.getElementById('editNumber').value.trim() || activeJob.number;
+  activeJob.location = document.getElementById('editLocation').value.trim() || activeJob.location;
+  activeJob.hours = document.getElementById('editHours').value.trim() || activeJob.hours;
+  activeJob.startDate = document.getElementById('editStartDate').value.trim() || activeJob.startDate;
+
+  activeJob.preConEmail = document.getElementById('editPreConEmail').value || activeJob.preConEmail;
+  activeJob.tbeEmail = document.getElementById('editTbeEmail').value || activeJob.tbeEmail;
+
+  // Light blue dropdowns - only if selected (lower priority)
+  const customer = document.getElementById('editCustomer').value.trim();
+  if (customer) activeJob.customer = customer;
+
+  const pmName = document.getElementById('editClientProjectManager').value.trim();
+  if (pmName) activeJob.clientProjectManager = pmName;
+
+  const pmNumber = document.getElementById('editPmNumber').value.trim();
+  if (pmNumber) activeJob.pmNumber = pmNumber;
+
+  const pmEmail = document.getElementById('editPmEmail').value.trim();
+  if (pmEmail) activeJob.pmEmail = pmEmail;
+
+  // Dark section - manual overrides (highest priority)
+  const manualCustomer = document.getElementById('newCustomer').value.trim();
+  if (manualCustomer) activeJob.customer = manualCustomer;
+
+  const manualPM = document.getElementById('newClientProjectManager').value.trim();
+  if (manualPM) activeJob.clientProjectManager = manualPM;
+
+  const manualPhone = document.getElementById('newPmNumber').value.trim();
+  if (manualPhone) activeJob.pmNumber = manualPhone;
+
+  const manualEmail = document.getElementById('newPmEmail').value.trim();
+  if (manualEmail) activeJob.pmEmail = manualEmail;
+
   editPane.classList.remove('open');
   renderAll();
   triggerAutoSave();
@@ -640,7 +718,6 @@ function triggerFileInput() {
   input.click();
 }
 document.getElementById('uploadCSV').onclick = triggerFileInput;
-// Download & modal
 document.getElementById('downloadAirOne').onclick = () => {
   window.open('https://airone.palmettoairbalance.com/project_management/projects/?_export=xls','_blank');
   document.getElementById('downloadModal').style.display = 'flex';
@@ -649,13 +726,11 @@ document.getElementById('triggerUpload').onclick = () => {
   triggerFileInput();
   document.getElementById('downloadModal').style.display = 'none';
 };
-// Swipe close
 let touchStartX = 0;
 detailPane.addEventListener('touchstart', e => touchStartX = e.touches[0].clientX);
 detailPane.addEventListener('touchmove', e => { if (e.touches[0].clientX - touchStartX > 100) detailPane.classList.remove('open'); });
 editPane.addEventListener('touchstart', e => touchStartX = e.touches[0].clientX);
 editPane.addEventListener('touchmove', e => { if (e.touches[0].clientX - touchStartX > 100) editPane.classList.remove('open'); });
-// Contact buttons
 document.getElementById('callPM').onclick = () => {
   if (activeJob && activeJob.pmNumber) {
     window.open(`tel:${activeJob.pmNumber.replace(/[^\d+]/g, '')}`,'_blank');
@@ -739,7 +814,6 @@ Thank you,`;
     alert('No Client PM email available for this job. Please enter it in the spreadsheet view.');
   }
 };
-// Delete job from detail pane
 document.getElementById('deleteJobBtn').onclick = function() {
   if (!activeJob) return;
   if (!confirm(`Delete job "${activeJob.name || 'Unnamed'} ${activeJob.number || ''}" permanently?`)) return;
@@ -752,9 +826,8 @@ document.getElementById('deleteJobBtn').onclick = function() {
     triggerAutoSave();
   }
 };
-// Event listeners
 document.getElementById('prevMonth').onclick = () => { currentMonth--; if (currentMonth < 0) { currentMonth = 11; currentYear--; } renderAll(); };
-document.getElementById('nextMonth').onclick = () => { currentMonth++; if (currentMonth > 11) { currentMonth = 0; currentYear++; } renderAll(); };
+document.getElementById('nextMonth').onclick = () => { currentMonth++; if (currentMonth > 11) { currentMonth = 0; currentYear--; } renderAll(); };
 document.getElementById('backBtn').onclick = () => detailPane.classList.remove('open');
 document.getElementById('editBtn').onclick = openEditPane;
 document.getElementById('editBackBtn').onclick = () => editPane.classList.remove('open');
@@ -826,7 +899,7 @@ function initSpreadsheet() {
             if (!confirm('Are you sure you want to permanently delete this job row?')) return;
 
             const visualRow = selection[0].start.row;
-            if (visualRow === 0) return; // header
+            if (visualRow === 0) return;
 
             const filtered = getFilteredJobs(document.getElementById('spreadsheetSearch').value);
             const jobToDelete = filtered[visualRow - 1];
@@ -837,14 +910,11 @@ function initSpreadsheet() {
               jobs.splice(realIndex, 1);
             }
 
-            // Force refresh — this removes the row visually
             updateSpreadsheetData();
-
             if (activeJob === jobToDelete) {
               document.getElementById('detailPane').classList.remove('open');
               activeJob = null;
             }
-
             renderAll();
             triggerAutoSave();
           }
