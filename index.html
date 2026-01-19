@@ -215,10 +215,10 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
     <select id="editClientProjectManager"></select>
 
     <label>PM Number</label>
-    <select id="editPmNumber"></select>
+    <input type="text" id="editPmNumber" readonly placeholder="Select name above">
 
     <label>PM Email</label>
-    <select id="editPmEmail"></select>
+    <input type="text" id="editPmEmail" readonly placeholder="Select name above">
   </div>
 
   <button id="saveEditBtn">Save Changes</button>
@@ -520,9 +520,8 @@ document.addEventListener('click', e => {
     const jobName = prompt('Enter Job Name:');
     if (!jobName) return;
     const jobNumber = prompt('Enter Job Number:') || '';
-    if (!jobNumber) return; // Require job number
-    // NEW: Check for duplicate job number
-    if (jobs.some(j => j.number === jobNumber) ) {
+    if (!jobNumber) return;
+    if (jobs.some(j => j.number === jobNumber)) {
       alert(`Job with number ${jobNumber} already exists!`);
       return;
     }
@@ -620,21 +619,26 @@ function openEditPane() {
   populateSelect('editCustomer', 'customer');
   document.getElementById('editCustomer').value = activeJob.customer || '';
 
-  // PM name dropdowns - all show names from Contacts
-  const pmDropdowns = ['editClientProjectManager', 'editPmNumber', 'editPmEmail'];
+  // Client Project Manager dropdown - only this one shows names
+  const pmSelect = document.getElementById('editClientProjectManager');
+  pmSelect.innerHTML = '<option value="">-- Select PM --</option>';
   const pmNames = [...new Set(contacts.map(c => c['Client Project Manager'] || '').filter(Boolean))].sort();
-
-  pmDropdowns.forEach(id => {
-    const select = document.getElementById(id);
-    select.innerHTML = '<option value="">-- Select PM --</option>';
-    pmNames.forEach(name => {
-      const opt = document.createElement('option');
-      opt.value = name;
-      opt.textContent = name;
-      select.appendChild(opt);
-    });
-    select.value = activeJob.clientProjectManager || '';
+  pmNames.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    pmSelect.appendChild(opt);
   });
+  pmSelect.value = activeJob.clientProjectManager || '';
+
+  // Pre-fill PM Number and PM Email if current PM exists
+  if (activeJob.clientProjectManager) {
+    const contact = contacts.find(c => c['Client Project Manager'] === activeJob.clientProjectManager);
+    if (contact) {
+      document.getElementById('editPmNumber').value = contact['PM Number'] || '';
+      document.getElementById('editPmEmail').value = contact['PM Email'] || '';
+    }
+  }
 
   // Dark section - manual overrides
   document.getElementById('newCustomer').value = '';
@@ -645,38 +649,28 @@ function openEditPane() {
   editPane.classList.add('open');
 }
 
-// Sync dropdowns and auto-fill number/email when any PM name is selected
-function setupPMSync() {
-  const pmDropdowns = ['editClientProjectManager', 'editPmNumber', 'editPmEmail'];
-
-  pmDropdowns.forEach(id => {
-    const select = document.getElementById(id);
-    if (select) {
-      select.addEventListener('change', (e) => {
-        const selectedName = e.target.value.trim();
-        if (!selectedName) {
-          pmDropdowns.forEach(d => document.getElementById(d).value = '');
-          return;
-        }
-
-        // Sync all dropdowns to the selected name
-        pmDropdowns.forEach(d => {
-          document.getElementById(d).value = selectedName;
-        });
-
-        // Auto-fill number & email from Contacts
-        const contact = contacts.find(c => c['Client Project Manager'] === selectedName);
-        if (contact) {
-          document.getElementById('editPmNumber').value = contact['PM Number'] || '';
-          document.getElementById('editPmEmail').value = contact['PM Email'] || '';
-        }
-      });
-    }
-  });
-}
-
+// Auto-fill PM Number and PM Email when Client Project Manager name changes
 document.addEventListener('DOMContentLoaded', () => {
-  setupPMSync();
+  const pmSelect = document.getElementById('editClientProjectManager');
+  if (pmSelect) {
+    pmSelect.addEventListener('change', (e) => {
+      const selectedName = e.target.value.trim();
+      if (!selectedName) {
+        document.getElementById('editPmNumber').value = '';
+        document.getElementById('editPmEmail').value = '';
+        return;
+      }
+
+      const contact = contacts.find(c => c['Client Project Manager'] === selectedName);
+      if (contact) {
+        document.getElementById('editPmNumber').value = contact['PM Number'] || '';
+        document.getElementById('editPmEmail').value = contact['PM Email'] || '';
+      } else {
+        document.getElementById('editPmNumber').value = '';
+        document.getElementById('editPmEmail').value = '';
+      }
+    });
+  }
 });
 
 function saveEditPane() {
@@ -699,7 +693,7 @@ function saveEditPane() {
   const pmName = document.getElementById('editClientProjectManager').value.trim();
   if (pmName) activeJob.clientProjectManager = pmName;
 
-  // Auto-filled or manual values
+  // Use the auto-filled or manual values
   activeJob.pmNumber = document.getElementById('editPmNumber').value.trim() || activeJob.pmNumber;
   activeJob.pmEmail = document.getElementById('editPmEmail').value.trim() || activeJob.pmEmail;
 
@@ -750,7 +744,6 @@ function triggerFileInput() {
           if (!r['Name'] && !r['Job Number']) return;
           const jobNumber = r['Job Number'] || '';
           if (jobNumber && jobs.some(j => j.number === jobNumber)) {
-            // Already exists - update status warning if needed
             const existing = jobs.find(j => j.number === jobNumber);
             if ((existing.status || '') !== r['Field Ops']) {
               existing.statusWarning = true;
