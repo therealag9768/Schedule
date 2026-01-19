@@ -204,7 +204,7 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
     <input type="text" id="newPmEmail" placeholder="Email address">
   </div>
 
-  <!-- Light blue background - select from existing -->
+  <!-- Light blue background - select from existing (all show PM names) -->
   <div class="section" style="background:#e3f2fd; border-radius:12px; margin:12px; padding:16px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
     <div style="margin-bottom:12px; font-weight:600;">Select from Existing</div>
 
@@ -215,10 +215,10 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
     <select id="editClientProjectManager"></select>
 
     <label>PM Number</label>
-    <input type="text" id="editPmNumber" readonly placeholder="Auto-filled from PM name">
+    <select id="editPmNumber"></select>
 
     <label>PM Email</label>
-    <input type="text" id="editPmEmail" readonly placeholder="Auto-filled from PM name">
+    <select id="editPmEmail"></select>
   </div>
 
   <button id="saveEditBtn">Save Changes</button>
@@ -241,6 +241,8 @@ let tokenClient;
 let gapiInited = false;
 let gisInited = false;
 let authInProgress = false;
+let contacts = []; // Contacts sheet data
+
 function gapiLoad() {
   gapi.load('client', async () => {
     try {
@@ -249,13 +251,13 @@ function gapiLoad() {
         discoveryDocs: [DISCOVERY_DOC],
       });
       gapiInited = true;
-      console.log('GAPI initialized');
       checkAndAutoLoad();
     } catch (err) {
       console.error('GAPI error:', err);
     }
   });
 }
+
 function gisLoaded() {
   try {
     tokenClient = google.accounts.oauth2.initTokenClient({
@@ -264,17 +266,19 @@ function gisLoaded() {
       callback: '',
     });
     gisInited = true;
-    console.log('GIS initialized');
     checkAndAutoLoad();
   } catch (err) {
     console.error('GIS error:', err);
   }
 }
+
 function checkAndAutoLoad() {
   if (gapiInited && gisInited && !authInProgress) {
     loadSheetData(true);
+    loadContacts(true);
   }
 }
+
 async function loadSheetData(silent = false) {
   if (!gapiInited) {
     if (!silent) alert('Google API not ready.');
@@ -283,7 +287,7 @@ async function loadSheetData(silent = false) {
   try {
     const response = await gapi.client.sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
-      range: 'A1:Z1000',
+      range: 'Sheet1!A1:Z1000',
     });
     const rows = response.result.values || [];
     if (rows.length === 0) {
@@ -331,6 +335,36 @@ async function loadSheetData(silent = false) {
     if (!silent) alert('Load failed.');
   }
 }
+
+async function loadContacts(silent = false) {
+  if (!gapiInited) {
+    if (!silent) alert('Google API not ready for Contacts.');
+    return;
+  }
+  try {
+    const response = await gapi.client.sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: 'Contacts!A1:Z1000',
+    });
+    const rows = response.result.values || [];
+    if (rows.length <= 1) {
+      if (!silent) alert('No contacts found.');
+      return;
+    }
+    const headers = rows[0].map(h => h.trim());
+    contacts = rows.slice(1).map(row => {
+      const c = {};
+      headers.forEach((h, idx) => {
+        c[h] = row[idx] !== undefined ? String(row[idx]).trim() : '';
+      });
+      return c;
+    });
+    console.log(`Loaded ${contacts.length} contacts`);
+  } catch (err) {
+    console.error('Contacts load error:', err);
+  }
+}
+
 async function saveToSheet(silent = false) {
   if (authInProgress) return;
   authInProgress = true;
@@ -373,7 +407,7 @@ async function performSave(silent = false) {
     });
     await gapi.client.sheets.spreadsheets.values.update({
       spreadsheetId: SHEET_ID,
-      range: 'A1',
+      range: 'Sheet1!A1',
       valueInputOption: 'RAW',
       resource: { values }
     });
@@ -559,7 +593,7 @@ function openEditPane() {
   if (!activeJob) return;
   document.getElementById('editTitle').textContent = `Edit: ${activeJob.name || 'Job'}`;
 
-  // White section - main fields
+  // White section
   document.getElementById('editFieldOps').value = activeJob.fieldOps || 'TAB';
   document.getElementById('editName').value = activeJob.name || '';
   document.getElementById('editNumber').value = activeJob.number || '';
@@ -567,30 +601,42 @@ function openEditPane() {
   document.getElementById('editHours').value = activeJob.hours || '';
   document.getElementById('editStartDate').value = activeJob.startDate || '';
 
-  // Dropdowns in white section
   populateSelect('editPreConEmail', 'preConEmail');
   populateSelect('editTbeEmail', 'tbeEmail');
   document.getElementById('editPreConEmail').value = activeJob.preConEmail || '';
   document.getElementById('editTbeEmail').value = activeJob.tbeEmail || '';
 
-  // Light blue section - dropdowns
+  // Customer dropdown
   populateSelect('editCustomer', 'customer');
-  populateSelect('editClientProjectManager', 'clientProjectManager');
-
   document.getElementById('editCustomer').value = activeJob.customer || '';
-  document.getElementById('editClientProjectManager').value = activeJob.clientProjectManager || '';
 
-  // Auto-fill PM Number & Email based on current PM name
-  const selectedPM = activeJob.clientProjectManager || '';
-  if (selectedPM) {
-    const matching = jobs.filter(j => j.clientProjectManager === selectedPM);
-    if (matching.length > 0) {
-      document.getElementById('editPmNumber').value = matching[0].pmNumber || '';
-      document.getElementById('editPmEmail').value = matching[0].pmEmail || '';
+  // PM dropdowns - all show names from Contacts
+  const pmDropdowns = ['editClientProjectManager', 'editPmNumber', 'editPmEmail'];
+  const pmNames = [...new Set(contacts.map(c => c['Client Project Manager'] || '').filter(Boolean))].sort();
+
+  pmDropdowns.forEach(id => {
+    const select = document.getElementById(id);
+    select.innerHTML = '<option value="">-- Select PM --</option>';
+    pmNames.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      select.appendChild(opt);
+    });
+    select.value = activeJob.clientProjectManager || '';
+  });
+
+  // Auto-fill number & email based on current PM name
+  const currentPM = activeJob.clientProjectManager || '';
+  if (currentPM) {
+    const contact = contacts.find(c => c['Client Project Manager'] === currentPM);
+    if (contact) {
+      document.getElementById('editPmNumber').value = contact['PM Number'] || '';
+      document.getElementById('editPmEmail').value = contact['PM Email'] || '';
     }
   }
 
-  // Dark section - start empty
+  // Dark section - manual overrides
   document.getElementById('newCustomer').value = '';
   document.getElementById('newClientProjectManager').value = '';
   document.getElementById('newPmNumber').value = '';
@@ -599,35 +645,48 @@ function openEditPane() {
   editPane.classList.add('open');
 }
 
-// Auto-fill PM Number & Email when PM name changes
-document.addEventListener('DOMContentLoaded', () => {
-  const pmSelect = document.getElementById('editClientProjectManager');
-  if (pmSelect) {
-    pmSelect.addEventListener('change', (e) => {
-      const selectedName = e.target.value.trim();
-      if (!selectedName) {
-        document.getElementById('editPmNumber').value = '';
-        document.getElementById('editPmEmail').value = '';
-        return;
-      }
+// Sync all PM dropdowns and auto-fill when any changes
+function setupPMSync() {
+  const pmDropdowns = ['editClientProjectManager', 'editPmNumber', 'editPmEmail'];
 
-      const matching = jobs.filter(j => j.clientProjectManager === selectedName);
-      if (matching.length > 0) {
-        // Use first match (you can improve this later if needed)
-        document.getElementById('editPmNumber').value = matching[0].pmNumber || '';
-        document.getElementById('editPmEmail').value = matching[0].pmEmail || '';
-      } else {
-        document.getElementById('editPmNumber').value = '';
-        document.getElementById('editPmEmail').value = '';
-      }
-    });
-  }
+  pmDropdowns.forEach(id => {
+    const select = document.getElementById(id);
+    if (select) {
+      select.addEventListener('change', (e) => {
+        const selectedName = e.target.value.trim();
+        if (!selectedName) {
+          pmDropdowns.forEach(d => document.getElementById(d).value = '');
+          document.getElementById('editPmNumber').value = '';
+          document.getElementById('editPmEmail').value = '';
+          return;
+        }
+
+        // Sync all dropdowns to the same name
+        pmDropdowns.forEach(d => {
+          document.getElementById(d).value = selectedName;
+        });
+
+        // Auto-fill number & email from Contacts
+        const contact = contacts.find(c => c['Client Project Manager'] === selectedName);
+        if (contact) {
+          document.getElementById('editPmNumber').value = contact['PM Number'] || '';
+          document.getElementById('editPmEmail').value = contact['PM Email'] || '';
+        } else {
+          document.getElementById('editPmNumber').value = '';
+          document.getElementById('editPmEmail').value = '';
+        }
+      });
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setupPMSync();
 });
 
 function saveEditPane() {
   if (!activeJob) return;
 
-  // White section - direct fields
   activeJob.fieldOps = document.getElementById('editFieldOps').value || activeJob.fieldOps;
   activeJob.status = activeJob.fieldOps;
   activeJob.name = document.getElementById('editName').value.trim() || activeJob.name;
@@ -639,22 +698,16 @@ function saveEditPane() {
   activeJob.preConEmail = document.getElementById('editPreConEmail').value || activeJob.preConEmail;
   activeJob.tbeEmail = document.getElementById('editTbeEmail').value || activeJob.tbeEmail;
 
-  // Light blue dropdowns
   const customer = document.getElementById('editCustomer').value.trim();
   if (customer) activeJob.customer = customer;
 
   const pmName = document.getElementById('editClientProjectManager').value.trim();
   if (pmName) activeJob.clientProjectManager = pmName;
 
-  // PM Number & Email are auto-filled from PM name selection
-  // But still allow override from dark section or direct edit
-  const pmNumber = document.getElementById('editPmNumber').value.trim();
-  if (pmNumber) activeJob.pmNumber = pmNumber;
+  activeJob.pmNumber = document.getElementById('editPmNumber').value.trim() || activeJob.pmNumber;
+  activeJob.pmEmail = document.getElementById('editPmEmail').value.trim() || activeJob.pmEmail;
 
-  const pmEmail = document.getElementById('editPmEmail').value.trim();
-  if (pmEmail) activeJob.pmEmail = pmEmail;
-
-  // Dark section - manual overrides (highest priority)
+  // Manual overrides
   const manualCustomer = document.getElementById('newCustomer').value.trim();
   if (manualCustomer) activeJob.customer = manualCustomer;
 
