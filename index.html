@@ -160,6 +160,7 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
       <button id="copyJob">Job Number</button>
       <button id="openAir">Open Air One</button>
       <button id="reportReady">Report Ready</button>
+      <button id="observationsBtn">Observations</button>
       <button id="jobLocation">Job Location</button>
       <button id="startEmail">Start Date Email</button>
       <button id="airOneSchedule">Air One Schedule</button>
@@ -368,6 +369,7 @@ async function loadSheetData(silent = false) {
         reportSent: r['Report Sent'] === 'TRUE',
         reportReadySentAt: r['Report Ready Sent At'] || '',
         startEmailSentAt: r['Start Email Sent At'] || '',
+        observationsSentAt: r['Observations Sent At'] || '',
         statusWarning: false,
         newJobFlag: false
       });
@@ -426,7 +428,7 @@ async function saveToSheet(silent = false) {
 }
 async function performSave(silent = false) {
   try {
-    const headers = ['Name','Job Number','Field Ops','Field Hours','Start Date','Scheduled Date','Customer','Client Project Manager','PM Number','PM Email','Location','Pre Con Email','TBE Email','Notes','Report Sent','Report Ready Sent At','Start Email Sent At'];
+    const headers = ['Name','Job Number','Field Ops','Field Hours','Start Date','Scheduled Date','Customer','Client Project Manager','PM Number','PM Email','Location','Pre Con Email','TBE Email','Notes','Report Sent','Report Ready Sent At','Start Email Sent At','Observations Sent At'];
     const values = [headers];
     jobs.forEach(j => {
       values.push([
@@ -446,7 +448,8 @@ async function performSave(silent = false) {
         j.notes || '',
         j.reportSent ? 'TRUE' : 'FALSE',
         j.reportReadySentAt || '',
-        j.startEmailSentAt || ''
+        j.startEmailSentAt || '',
+        j.observationsSentAt || ''
       ]);
     });
     await gapi.client.sheets.spreadsheets.values.update({
@@ -590,6 +593,7 @@ document.addEventListener('click', e => {
       reportSent: false,
       reportReadySentAt: '',
       startEmailSentAt: '',
+      observationsSentAt: '',
       statusWarning: false,
       newJobFlag: false
     });
@@ -651,6 +655,9 @@ function openJob(j) {
   if (j.startEmailSentAt) {
     stamps.innerHTML += `<div>🔴 PM Start date email sent ${j.startEmailSentAt}</div>`;
   }
+  if (j.observationsSentAt) {
+    stamps.innerHTML += `<div>🟡 Observations email sent ${j.observationsSentAt}</div>`;
+  }
   const toggle = document.getElementById('reportSentToggle');
   toggle.checked = j.reportSent || false;
   detailPane.classList.add('open');
@@ -692,7 +699,7 @@ function openEditPane() {
   document.getElementById('editNumber').value = activeJob.number || '';
   document.getElementById('editLocation').value = activeJob.location || '';
   document.getElementById('editHours').value = activeJob.hours || '';
-  // Start Date calendar input (ISO for picker, convert on save)
+
   let startIso = '';
   if (activeJob.startDate) {
     const parts = activeJob.startDate.split('/');
@@ -780,14 +787,12 @@ function saveEditPane() {
   activeJob.location = document.getElementById('editLocation').value.trim() || activeJob.location;
   activeJob.hours = document.getElementById('editHours').value.trim() || activeJob.hours;
 
-  // Start Date from picker
   let startDateVal = document.getElementById('editStartDate').value;
   if (startDateVal) {
     const parts = startDateVal.split('-');
     activeJob.startDate = `${parseInt(parts[1],10)}/${parseInt(parts[2],10)}/${parts[0]}`;
   }
 
-  // Scheduled Date from picker
   let schedDateVal = document.getElementById('editScheduledDate').value;
   if (schedDateVal) {
     const parts = schedDateVal.split('-');
@@ -886,6 +891,7 @@ function triggerFileInput() {
             reportSent: false,
             reportReadySentAt: '',
             startEmailSentAt: '',
+            observationsSentAt: '',
             statusWarning: false,
             newJobFlag: previousJobList.length > 0 ? true : false
           };
@@ -931,18 +937,35 @@ document.getElementById('callPM').onclick = () => {
   }
 };
 document.getElementById('emailPM').onclick = () => {
-  if (activeJob && activeJob.pmEmail) {
-    window.open(`mailto:${activeJob.pmEmail}`,'_blank');
-  } else {
+  if (!activeJob) return;
+  const pmEmail = activeJob.pmEmail || '';
+  if (!pmEmail) {
     alert('No PM email available.');
+    return;
   }
+  const subject = `🟡 ${activeJob.name || ''} ${activeJob.number || ''}`;
+  let firstName = 'All';
+  if (activeJob.clientProjectManager) {
+    const nameParts = activeJob.clientProjectManager.trim().split(' ');
+    firstName = nameParts[0] || 'All';
+  }
+  const body = `${firstName},
+
+[Your message here]
+
+Thank you,
+`;
+  window.open(`mailto:${encodeURIComponent(pmEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
 };
 document.getElementById('textPM').onclick = () => {
-  if (activeJob && activeJob.pmNumber) {
-    window.open(`sms:${activeJob.pmNumber.replace(/[^\d+]/g, '')}`,'_blank');
-  } else {
-    alert('No PM phone number available for texting.');
+  if (!activeJob) return;
+  const pmNumber = activeJob.pmNumber || '';
+  if (!pmNumber) {
+    alert('No PM phone number available.');
+    return;
   }
+  const body = `${activeJob.name || ''} ${activeJob.number || ''}`;
+  window.open(`sms:${pmNumber.replace(/[^\d+]/g, '')}?body=${encodeURIComponent(body)}`, '_blank');
 };
 document.getElementById('copyJob').onclick = () => {
   if (activeJob && activeJob.number) {
@@ -982,10 +1005,36 @@ Thank you,
 `;
   const mailtoLink = `mailto:${recipients ? encodeURIComponent(recipients) : ''}?cc=${encodeURIComponent(ccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.open(mailtoLink, '_blank');
-  // Stamp
   const now = new Date();
   const stamp = `${now.getMonth()+1}/${now.getDate()}/${now.getFullYear()} ${now.getHours()}:${now.getMinutes().toString().padStart(2,'0')} ${now.getHours() >= 12 ? 'PM' : 'AM'}`;
   activeJob.reportReadySentAt = stamp;
+  triggerAutoSave();
+  openJob(activeJob);
+};
+document.getElementById('observationsBtn').onclick = () => {
+  if (!activeJob) return;
+  const pmEmail = activeJob.pmEmail || '';
+  if (!pmEmail) {
+    alert('No PM email available.');
+    return;
+  }
+  const subject = `🟡 ${activeJob.name || ''} ${activeJob.number || ''}`;
+  let firstName = 'All';
+  if (activeJob.clientProjectManager) {
+    const nameParts = activeJob.clientProjectManager.trim().split(' ');
+    firstName = nameParts[0] || 'All';
+  }
+  const body = `${firstName},
+
+Read, See attached observations. Please select or fill out each item with a response and send back to us here. This will ensure we are only checking items that are ready to re-check.
+
+Thank you,
+
+`;
+  window.open(`mailto:${encodeURIComponent(pmEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
+  const now = new Date();
+  const stamp = `${now.getMonth()+1}/${now.getDate()}/${now.getFullYear()} ${now.getHours()}:${now.getMinutes().toString().padStart(2,'0')} ${now.getHours() >= 12 ? 'PM' : 'AM'}`;
+  activeJob.observationsSentAt = stamp;
   triggerAutoSave();
   openJob(activeJob);
 };
@@ -1187,6 +1236,7 @@ document.getElementById('addRow').onclick = () => {
     reportSent: false,
     reportReadySentAt: '',
     startEmailSentAt: '',
+    observationsSentAt: '',
     statusWarning: false,
     newJobFlag: false
   };
