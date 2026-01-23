@@ -204,7 +204,7 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
     <input type="text" id="editHours" placeholder="Field Hours">
 
     <label>Start Date</label>
-    <input type="text" id="editStartDate" placeholder="MM/DD/YYYY">
+    <input type="date" id="editStartDate">
 
     <label>Scheduled Date</label>
     <input type="date" id="editScheduledDate">
@@ -335,18 +335,25 @@ async function loadSheetData(silent = false) {
       const jobNumber = r['Job Number'] || '';
       if (jobNumber && seenNumbers.has(jobNumber)) continue;
       seenNumbers.add(jobNumber);
-      let rawDate = r['Start Date'] || '';
-      let parts = rawDate.split('/');
-      if (parts.length === 3) {
-        parts[0] = parseInt(parts[0], 10).toString();
-        parts[1] = parseInt(parts[1], 10).toString();
-        rawDate = parts.join('/');
+      let rawStart = r['Start Date'] || '';
+      let rawSched = r['Scheduled Date'] || rawStart;
+      let partsStart = rawStart.split('/');
+      if (partsStart.length === 3) {
+        partsStart[0] = parseInt(partsStart[0], 10).toString();
+        partsStart[1] = parseInt(partsStart[1], 10).toString();
+        rawStart = partsStart.join('/');
+      }
+      let partsSched = rawSched.split('/');
+      if (partsSched.length === 3) {
+        partsSched[0] = parseInt(partsSched[0], 10).toString();
+        partsSched[1] = parseInt(partsSched[1], 10).toString();
+        rawSched = partsSched.join('/');
       }
       jobs.push({
         name: r['Name'] || '',
         number: jobNumber,
-        startDate: rawDate,
-        scheduledDate: r['Scheduled Date'] || rawDate,
+        startDate: rawStart,
+        scheduledDate: rawSched,
         status: r['Field Ops'] || 'TAB',
         fieldOps: r['Field Ops'] || 'TAB',
         location: r['Location'] || '',
@@ -685,8 +692,26 @@ function openEditPane() {
   document.getElementById('editNumber').value = activeJob.number || '';
   document.getElementById('editLocation').value = activeJob.location || '';
   document.getElementById('editHours').value = activeJob.hours || '';
-  document.getElementById('editStartDate').value = activeJob.startDate || '';
-  document.getElementById('editScheduledDate').value = activeJob.scheduledDate ? new Date(activeJob.scheduledDate).toISOString().split('T')[0] : (activeJob.startDate ? new Date(activeJob.startDate).toISOString().split('T')[0] : '');
+  // Start Date calendar input (ISO for picker, convert on save)
+  let startIso = '';
+  if (activeJob.startDate) {
+    const parts = activeJob.startDate.split('/');
+    if (parts.length === 3) {
+      startIso = `${parts[2]}-${parts[0].padStart(2,'0')}-${parts[1].padStart(2,'0')}`;
+    }
+  }
+  document.getElementById('editStartDate').value = startIso;
+
+  let schedIso = '';
+  if (activeJob.scheduledDate) {
+    const parts = activeJob.scheduledDate.split('/');
+    if (parts.length === 3) {
+      schedIso = `${parts[2]}-${parts[0].padStart(2,'0')}-${parts[1].padStart(2,'0')}`;
+    }
+  } else if (startIso) {
+    schedIso = startIso;
+  }
+  document.getElementById('editScheduledDate').value = schedIso;
 
   populateSelect('editPreConEmail', 'preConEmail');
   populateSelect('editTbeEmail', 'tbeEmail');
@@ -754,10 +779,18 @@ function saveEditPane() {
   activeJob.number = document.getElementById('editNumber').value.trim() || activeJob.number;
   activeJob.location = document.getElementById('editLocation').value.trim() || activeJob.location;
   activeJob.hours = document.getElementById('editHours').value.trim() || activeJob.hours;
-  activeJob.startDate = document.getElementById('editStartDate').value.trim() || activeJob.startDate;
-  let schedDate = document.getElementById('editScheduledDate').value;
-  if (schedDate) {
-    const parts = schedDate.split('-');
+
+  // Start Date from picker
+  let startDateVal = document.getElementById('editStartDate').value;
+  if (startDateVal) {
+    const parts = startDateVal.split('-');
+    activeJob.startDate = `${parseInt(parts[1],10)}/${parseInt(parts[2],10)}/${parts[0]}`;
+  }
+
+  // Scheduled Date from picker
+  let schedDateVal = document.getElementById('editScheduledDate').value;
+  if (schedDateVal) {
+    const parts = schedDateVal.split('-');
     activeJob.scheduledDate = `${parseInt(parts[1],10)}/${parseInt(parts[2],10)}/${parts[0]}`;
   } else {
     activeJob.scheduledDate = activeJob.startDate;
@@ -827,18 +860,18 @@ function triggerFileInput() {
             }
             return;
           }
-          let rawDate = r['Start Date'] || '';
-          let parts = rawDate.split('/');
-          if (parts.length === 3) {
-            parts[0] = parseInt(parts[0], 10).toString();
-            parts[1] = parseInt(parts[1], 10).toString();
-            rawDate = parts.join('/');
+          let rawStart = r['Start Date'] || '';
+          let partsStart = rawStart.split('/');
+          if (partsStart.length === 3) {
+            partsStart[0] = parseInt(partsStart[0], 10).toString();
+            partsStart[1] = parseInt(partsStart[1], 10).toString();
+            rawStart = partsStart.join('/');
           }
           const newJob = {
             name: r['Name'] || '',
             number: jobNumber,
-            startDate: rawDate,
-            scheduledDate: rawDate,
+            startDate: rawStart,
+            scheduledDate: rawStart,
             status: r['Field Ops'] || 'TAB',
             fieldOps: r['Field Ops'] || 'TAB',
             location: r['Location'] || '',
@@ -938,12 +971,15 @@ document.getElementById('reportReady').onclick = () => {
   const ccList = 'dfunchess@palmettoairbalance.com';
   const subject = `✅ ${activeJob.name || ''} ${activeJob.number || ''}`;
   const body = `All,
+
 1.) Job is complete.
 2.) Synopsis added.
 3.) No changes to drawings.
 4.) Report data is ready for TBE review.
 5.) Job has or does not have an engineer stamp. Guarantee ?
-Thank you,`;
+
+Thank you,
+`;
   const mailtoLink = `mailto:${recipients ? encodeURIComponent(recipients) : ''}?cc=${encodeURIComponent(ccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.open(mailtoLink, '_blank');
   // Stamp
@@ -951,7 +987,7 @@ Thank you,`;
   const stamp = `${now.getMonth()+1}/${now.getDate()}/${now.getFullYear()} ${now.getHours()}:${now.getMinutes().toString().padStart(2,'0')} ${now.getHours() >= 12 ? 'PM' : 'AM'}`;
   activeJob.reportReadySentAt = stamp;
   triggerAutoSave();
-  openJob(activeJob); // Refresh stamps
+  openJob(activeJob);
 };
 document.getElementById('startEmail').onclick = () => {
   if (!activeJob) return;
@@ -965,7 +1001,8 @@ document.getElementById('startEmail').onclick = () => {
     firstName = nameParts[0] || 'All';
   }
   const subject = `🔴 ${activeJob.name || ''} ${activeJob.number || ''}`;
-  const body = `Hi ${firstName},
+  const body = `${firstName},
+
 I am the Project Manager for test and balance on this project.
 Please provide the following listed below for Test and Balance(TAB):
 SEND TO ME:
@@ -981,15 +1018,16 @@ Any important job requirements or information to help ensure a successful start 
 • We schedule every Thursday for the following week.
 • If a start date has been requested, we will contact you on our scheduling day to confirm.
 • If you do not respond to confirm the schedule, your project will not be scheduled.
-Thank you,`;
+
+Thank you,
+`;
   if (pmEmail) {
     window.open(`mailto:${encodeURIComponent(pmEmail)}?cc=${encodeURIComponent(ccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
-    // Stamp
     const now = new Date();
     const stamp = `${now.getMonth()+1}/${now.getDate()}/${now.getFullYear()} ${now.getHours()}:${now.getMinutes().toString().padStart(2,'0')} ${now.getHours() >= 12 ? 'PM' : 'AM'}`;
     activeJob.startEmailSentAt = stamp;
     triggerAutoSave();
-    openJob(activeJob); // Refresh stamps
+    openJob(activeJob);
   } else {
     alert('No Client PM email available for this job. Please enter it in the spreadsheet view.');
   }
