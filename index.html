@@ -159,11 +159,11 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
     <div class="btnGrid">
       <button id="copyJob">Job Number</button>
       <button id="openAir">Open Air One</button>
-      <button id="reportReady">Report Ready</button>
-      <button id="observationsBtn">Observations</button>
-      <button id="jobLocation">Job Location</button>
-      <button id="startEmail">Start Date Email</button>
       <button id="airOneSchedule">Air One Schedule</button>
+      <button id="startEmail">Start Date Email</button>
+       <button id="observationsBtn">Observations</button>
+      <button id="reportReady">Report Ready</button>
+      <button id="jobLocation">Job Location</button>
     </div>
   </div>
   <div class="section">
@@ -951,9 +951,10 @@ document.getElementById('emailPM').onclick = () => {
   }
   const body = `${firstName},
 
-[Your message here]
+
 
 Thank you,
+
 `;
   window.open(`mailto:${encodeURIComponent(pmEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
 };
@@ -1001,7 +1002,9 @@ document.getElementById('reportReady').onclick = () => {
 4.) Report data is ready for TBE review.
 5.) Job has or does not have an engineer stamp. Guarantee ?
 
+
 Thank you,
+
 `;
   const mailtoLink = `mailto:${recipients ? encodeURIComponent(recipients) : ''}?cc=${encodeURIComponent(ccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.open(mailtoLink, '_blank');
@@ -1026,7 +1029,8 @@ document.getElementById('observationsBtn').onclick = () => {
   }
   const body = `${firstName},
 
-Read, See attached observations. Please select or fill out each item with a response and send back to us here. This will ensure we are only checking items that are ready to re-check.
+See attached observations. Please select or fill out each item with a response and send back to us here. This will ensure we are only checking items that are ready to re-check.
+
 
 Thank you,
 
@@ -1067,6 +1071,7 @@ Any important job requirements or information to help ensure a successful start 
 • We schedule every Thursday for the following week.
 • If a start date has been requested, we will contact you on our scheduling day to confirm.
 • If you do not respond to confirm the schedule, your project will not be scheduled.
+
 
 Thank you,
 `;
@@ -1259,3 +1264,4 @@ renderAll();
 </script>
 </body>
 </html>
+
