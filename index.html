@@ -29,6 +29,7 @@ header{padding:14px;background:#1e88e5;color:#fff;font-size:24px;font-weight:600
 .status-yellow{background:#fbc02d;color:#000}
 .status-red{background:#ff5252;color:#fff}
 .status-standby{background:#d3d3d3;color:#000}
+.pending-report{background:#fff3cd;color:#856404;border-left:5px solid #ffc107}
 #detailPane{position:fixed;top:0;right:-100%;width:100%;height:100%;background:#fff;z-index:50;transition:.25s ease;overflow-y:auto;touch-action:pan-y;display:flex;flex-direction:column}
 @media(min-width:900px){#detailPane{width:50%;right:-50%}}
 #detailPane.open{right:0}
@@ -38,7 +39,7 @@ header{padding:14px;background:#1e88e5;color:#fff;font-size:24px;font-weight:600
 #editBtn{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:24px;cursor:pointer;color:#fff}
 .section{padding:16px;border-bottom:1px solid #eee}
 .row{display:flex;justify-content:space-between;margin-bottom:10px;font-size:16px}
-select,textarea,input[type="text"]{width:100%;padding:12px;border-radius:12px;border:1px solid #ccc;font-size:16px;box-sizing:border-box;margin-top:6px}
+select,textarea,input[type="text"],input[type="date"]{width:100%;padding:12px;border-radius:12px;border:1px solid #ccc;font-size:16px;box-sizing:border-box;margin-top:6px}
 textarea#notes{resize:none;overflow:hidden;min-height:100px}
 .detail-pane-button{padding:14px;min-height:52px;border:none;border-radius:14px;background:#1e88e5;color:#fff;font-size:16px;cursor:pointer;text-align:center;box-sizing:border-box;font-weight:500;width:100%;max-width:none}
 .btnGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
@@ -47,6 +48,10 @@ textarea#notes{resize:none;overflow:hidden;min-height:100px}
 .contactButtons{display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap}
 .contactButtons button{@extend .detail-pane-button}
 .delete-job-btn{background:#d32f2f !important;color:#fff;margin-top:16px;font-weight:bold;}
+.pending-section{margin-bottom:20px;border:1px solid #ffc107;background:#fff3cd;padding:10px;border-radius:8px}
+.pending-section h3{margin:0 0 10px 0;color:#856404}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#4caf50;color:white;padding:12px 24px;border-radius:8px;z-index:1000;opacity:0;transition:opacity 0.5s}
+#toast.show{opacity:1}
 @media(max-width:768px){.btnGrid{grid-template-columns:1fr;gap:10px}.contactButtons{flex-direction:column;gap:10px}}
 #jobSearch{margin:12px 0;padding:8px 12px;font-size:18px;border-radius:8px;border:1px solid #ccc;width:100%;max-width:1075px;box-sizing:border-box}
 #spreadsheetView{display:none;flex-direction:column;align-items:center;width:100%;padding:12px;box-sizing:border-box}
@@ -88,6 +93,22 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
     <button id="viewSpreadsheet">View All Jobs Spreadsheet</button>
   </div>
   <div id="jobTableContainer">
+    <div id="pendingReportsSection" class="pending-section" style="display:none;">
+      <h3>Pending Report Sent Confirmation</h3>
+      <table id="pendingTable">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Job Number</th>
+            <th>Field Ops</th>
+            <th>Start Date</th>
+            <th>Field Hours</th>
+            <th>Customer</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
     <table id="jobTable">
       <thead>
         <tr>
@@ -122,6 +143,10 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
     <span id="editBtn">✎</span>
   </div>
   <div class="section" id="detailInfo"></div>
+  <div class="section">
+    <label>Report sent?</label>
+    <input type="checkbox" id="reportSentToggle">
+  </div>
   <div class="section contactSection">
     <div style="margin-bottom:8px;font-weight:600">Contact Client PM:</div>
     <div class="contactButtons">
@@ -141,6 +166,7 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
     </div>
   </div>
   <div class="section">
+    <div id="emailStamps"></div>
     <label>Notes:</label>
     <textarea id="notes" placeholder="Notes"></textarea>
   </div>
@@ -179,6 +205,9 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
 
     <label>Start Date</label>
     <input type="text" id="editStartDate" placeholder="MM/DD/YYYY">
+
+    <label>Scheduled Date</label>
+    <input type="date" id="editScheduledDate">
 
     <label>Pre Con Email</label>
     <select id="editPreConEmail"></select>
@@ -223,6 +252,7 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
 
   <button id="saveEditBtn">Save Changes</button>
 </div>
+<div id="toast">Job number copied!</div>
 <div id="downloadModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;z-index:100">
   <div style="background:#fff;padding:24px;border-radius:12px;display:flex;flex-direction:column;align-items:center;gap:12px">
     <div>Air One XLS downloaded.</div>
@@ -241,7 +271,7 @@ let tokenClient;
 let gapiInited = false;
 let gisInited = false;
 let authInProgress = false;
-let contacts = []; // Contacts sheet data
+let contacts = [];
 
 function gapiLoad() {
   gapi.load('client', async () => {
@@ -303,7 +333,7 @@ async function loadSheetData(silent = false) {
         r[h] = rows[i][idx] !== undefined ? String(rows[i][idx]).trim() : '';
       });
       const jobNumber = r['Job Number'] || '';
-      if (jobNumber && seenNumbers.has(jobNumber)) continue; 
+      if (jobNumber && seenNumbers.has(jobNumber)) continue;
       seenNumbers.add(jobNumber);
       let rawDate = r['Start Date'] || '';
       let parts = rawDate.split('/');
@@ -328,6 +358,9 @@ async function loadSheetData(silent = false) {
         preConEmail: r['Pre Con Email'] || '',
         tbeEmail: r['TBE Email'] || '',
         notes: r['Notes'] || '',
+        reportSent: r['Report Sent'] === 'TRUE',
+        reportReadySentAt: r['Report Ready Sent At'] || '',
+        startEmailSentAt: r['Start Email Sent At'] || '',
         statusWarning: false,
         newJobFlag: false
       });
@@ -351,10 +384,7 @@ async function loadContacts(silent = false) {
       range: 'Contacts!A1:Z1000',
     });
     const rows = response.result.values || [];
-    if (rows.length <= 1) {
-      if (!silent) alert('No contacts found.');
-      return;
-    }
+    if (rows.length <= 1) return;
     const headers = rows[0].map(h => h.trim());
     contacts = rows.slice(1).map(row => {
       const c = {};
@@ -389,7 +419,7 @@ async function saveToSheet(silent = false) {
 }
 async function performSave(silent = false) {
   try {
-    const headers = ['Name','Job Number','Field Ops','Field Hours','Start Date','Scheduled Date','Customer','Client Project Manager','PM Number','PM Email','Location','Pre Con Email','TBE Email','Notes'];
+    const headers = ['Name','Job Number','Field Ops','Field Hours','Start Date','Scheduled Date','Customer','Client Project Manager','PM Number','PM Email','Location','Pre Con Email','TBE Email','Notes','Report Sent','Report Ready Sent At','Start Email Sent At'];
     const values = [headers];
     jobs.forEach(j => {
       values.push([
@@ -406,7 +436,10 @@ async function performSave(silent = false) {
         j.location || '',
         j.preConEmail || '',
         j.tbeEmail || '',
-        j.notes || ''
+        j.notes || '',
+        j.reportSent ? 'TRUE' : 'FALSE',
+        j.reportReadySentAt || '',
+        j.startEmailSentAt || ''
       ]);
     });
     await gapi.client.sheets.spreadsheets.values.update({
@@ -457,6 +490,12 @@ function autoGrowNotes() {
     notes.style.height = 'auto';
     notes.style.height = notes.scrollHeight + 'px';
   }
+}
+function showToast(message) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2000);
 }
 function renderCalendar() {
   document.getElementById('currentMonthLabel').textContent = monthNames[currentMonth] + ' ' + currentYear;
@@ -541,6 +580,9 @@ document.addEventListener('click', e => {
       preConEmail: '',
       tbeEmail: '',
       notes: '',
+      reportSent: false,
+      reportReadySentAt: '',
+      startEmailSentAt: '',
       statusWarning: false,
       newJobFlag: false
     });
@@ -561,6 +603,24 @@ function renderList(filteredJobs) {
     tbody.appendChild(tr);
   });
 }
+function renderPendingReports() {
+  const pendingSection = document.getElementById('pendingReportsSection');
+  const pendingTbody = document.querySelector('#pendingTable tbody');
+  pendingTbody.innerHTML = '';
+  const pendingJobs = jobs.filter(j => j.status === 'Complete' && !j.reportSent);
+  if (pendingJobs.length === 0) {
+    pendingSection.style.display = 'none';
+    return;
+  }
+  pendingSection.style.display = 'block';
+  pendingJobs.forEach(j => {
+    const tr = document.createElement('tr');
+    tr.className = 'pending-report';
+    tr.innerHTML = `<td>${j.name||''} ⚠️REPORT SENT?</td><td>${j.number||''}</td><td>${j.fieldOps||''}</td><td>${j.startDate||''}</td><td>${j.hours||''}</td><td>${j.customer||''}</td>`;
+    tr.onclick = () => openJob(j);
+    pendingTbody.appendChild(tr);
+  });
+}
 function openJob(j) {
   activeJob = j;
   document.getElementById('detailTitle').textContent = `${j.name||'Unnamed'} ${j.number||''}`;
@@ -576,13 +636,31 @@ function openJob(j) {
   const notes = document.getElementById('notes');
   notes.value = j.notes || '';
   autoGrowNotes();
+  const stamps = document.getElementById('emailStamps');
+  stamps.innerHTML = '';
+  if (j.reportReadySentAt) {
+    stamps.innerHTML += `<div>✅ Report ready email sent ${j.reportReadySentAt}</div>`;
+  }
+  if (j.startEmailSentAt) {
+    stamps.innerHTML += `<div>🔴 PM Start date email sent ${j.startEmailSentAt}</div>`;
+  }
+  const toggle = document.getElementById('reportSentToggle');
+  toggle.checked = j.reportSent || false;
   detailPane.classList.add('open');
+  renderPendingReports();
 }
 document.getElementById('notes').addEventListener('input', () => {
   if (activeJob) {
     activeJob.notes = document.getElementById('notes').value;
     autoGrowNotes();
     triggerAutoSave();
+  }
+});
+document.getElementById('reportSentToggle').addEventListener('change', (e) => {
+  if (activeJob) {
+    activeJob.reportSent = e.target.checked;
+    triggerAutoSave();
+    renderPendingReports();
   }
 });
 function getUnique(field) {
@@ -602,24 +680,22 @@ function openEditPane() {
   if (!activeJob) return;
   document.getElementById('editTitle').textContent = `Edit: ${activeJob.name || 'Job'}`;
 
-  // White section
   document.getElementById('editFieldOps').value = activeJob.fieldOps || 'TAB';
   document.getElementById('editName').value = activeJob.name || '';
   document.getElementById('editNumber').value = activeJob.number || '';
   document.getElementById('editLocation').value = activeJob.location || '';
   document.getElementById('editHours').value = activeJob.hours || '';
   document.getElementById('editStartDate').value = activeJob.startDate || '';
+  document.getElementById('editScheduledDate').value = activeJob.scheduledDate ? new Date(activeJob.scheduledDate).toISOString().split('T')[0] : (activeJob.startDate ? new Date(activeJob.startDate).toISOString().split('T')[0] : '');
 
   populateSelect('editPreConEmail', 'preConEmail');
   populateSelect('editTbeEmail', 'tbeEmail');
   document.getElementById('editPreConEmail').value = activeJob.preConEmail || '';
   document.getElementById('editTbeEmail').value = activeJob.tbeEmail || '';
 
-  // Customer dropdown
   populateSelect('editCustomer', 'customer');
   document.getElementById('editCustomer').value = activeJob.customer || '';
 
-  // Client Project Manager dropdown - only this one shows names
   const pmSelect = document.getElementById('editClientProjectManager');
   pmSelect.innerHTML = '<option value="">-- Select PM --</option>';
   const pmNames = [...new Set(contacts.map(c => c['Client Project Manager'] || '').filter(Boolean))].sort();
@@ -631,7 +707,6 @@ function openEditPane() {
   });
   pmSelect.value = activeJob.clientProjectManager || '';
 
-  // Pre-fill PM Number and PM Email if current PM exists
   if (activeJob.clientProjectManager) {
     const contact = contacts.find(c => c['Client Project Manager'] === activeJob.clientProjectManager);
     if (contact) {
@@ -640,7 +715,6 @@ function openEditPane() {
     }
   }
 
-  // Dark section - manual overrides
   document.getElementById('newCustomer').value = '';
   document.getElementById('newClientProjectManager').value = '';
   document.getElementById('newPmNumber').value = '';
@@ -649,7 +723,6 @@ function openEditPane() {
   editPane.classList.add('open');
 }
 
-// Auto-fill PM Number and PM Email when Client Project Manager name changes
 document.addEventListener('DOMContentLoaded', () => {
   const pmSelect = document.getElementById('editClientProjectManager');
   if (pmSelect) {
@@ -660,7 +733,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('editPmEmail').value = '';
         return;
       }
-
       const contact = contacts.find(c => c['Client Project Manager'] === selectedName);
       if (contact) {
         document.getElementById('editPmNumber').value = contact['PM Number'] || '';
@@ -683,6 +755,13 @@ function saveEditPane() {
   activeJob.location = document.getElementById('editLocation').value.trim() || activeJob.location;
   activeJob.hours = document.getElementById('editHours').value.trim() || activeJob.hours;
   activeJob.startDate = document.getElementById('editStartDate').value.trim() || activeJob.startDate;
+  let schedDate = document.getElementById('editScheduledDate').value;
+  if (schedDate) {
+    const parts = schedDate.split('-');
+    activeJob.scheduledDate = `${parseInt(parts[1],10)}/${parseInt(parts[2],10)}/${parts[0]}`;
+  } else {
+    activeJob.scheduledDate = activeJob.startDate;
+  }
 
   activeJob.preConEmail = document.getElementById('editPreConEmail').value || activeJob.preConEmail;
   activeJob.tbeEmail = document.getElementById('editTbeEmail').value || activeJob.tbeEmail;
@@ -693,11 +772,9 @@ function saveEditPane() {
   const pmName = document.getElementById('editClientProjectManager').value.trim();
   if (pmName) activeJob.clientProjectManager = pmName;
 
-  // Use the auto-filled or manual values
   activeJob.pmNumber = document.getElementById('editPmNumber').value.trim() || activeJob.pmNumber;
   activeJob.pmEmail = document.getElementById('editPmEmail').value.trim() || activeJob.pmEmail;
 
-  // Manual overrides (highest priority)
   const manualCustomer = document.getElementById('newCustomer').value.trim();
   if (manualCustomer) activeJob.customer = manualCustomer;
 
@@ -773,6 +850,9 @@ function triggerFileInput() {
             preConEmail: r['Pre Con Email'] || '',
             tbeEmail: r['TBE Email'] || '',
             notes: '',
+            reportSent: false,
+            reportReadySentAt: '',
+            startEmailSentAt: '',
             statusWarning: false,
             newJobFlag: previousJobList.length > 0 ? true : false
           };
@@ -833,7 +913,11 @@ document.getElementById('textPM').onclick = () => {
 };
 document.getElementById('copyJob').onclick = () => {
   if (activeJob && activeJob.number) {
-    navigator.clipboard.writeText(activeJob.number).then(() => alert(`Job number ${activeJob.number} copied!`)).catch(() => alert('Copy failed'));
+    navigator.clipboard.writeText(activeJob.number).then(() => {
+      showToast('Job number copied!');
+    }).catch(() => {
+      showToast('Copy failed');
+    });
   }
 };
 document.getElementById('openAir').onclick = () => window.open('https://airone.palmettoairbalance.com/project_management/projects/','_blank');
@@ -862,6 +946,12 @@ document.getElementById('reportReady').onclick = () => {
 Thank you,`;
   const mailtoLink = `mailto:${recipients ? encodeURIComponent(recipients) : ''}?cc=${encodeURIComponent(ccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.open(mailtoLink, '_blank');
+  // Stamp
+  const now = new Date();
+  const stamp = `${now.getMonth()+1}/${now.getDate()}/${now.getFullYear()} ${now.getHours()}:${now.getMinutes().toString().padStart(2,'0')} ${now.getHours() >= 12 ? 'PM' : 'AM'}`;
+  activeJob.reportReadySentAt = stamp;
+  triggerAutoSave();
+  openJob(activeJob); // Refresh stamps
 };
 document.getElementById('startEmail').onclick = () => {
   if (!activeJob) return;
@@ -869,8 +959,13 @@ document.getElementById('startEmail').onclick = () => {
   const preConEmail = activeJob.preConEmail || '';
   const tbeEmail = activeJob.tbeEmail || '';
   const ccList = [preConEmail, tbeEmail, 'dfunchess@palmettoairbalance.com'].filter(e => e).join(',');
+  let firstName = 'All';
+  if (activeJob.clientProjectManager) {
+    const nameParts = activeJob.clientProjectManager.trim().split(' ');
+    firstName = nameParts[0] || 'All';
+  }
   const subject = `🔴 ${activeJob.name || ''} ${activeJob.number || ''}`;
-  const body = `All,
+  const body = `Hi ${firstName},
 I am the Project Manager for test and balance on this project.
 Please provide the following listed below for Test and Balance(TAB):
 SEND TO ME:
@@ -889,6 +984,12 @@ Any important job requirements or information to help ensure a successful start 
 Thank you,`;
   if (pmEmail) {
     window.open(`mailto:${encodeURIComponent(pmEmail)}?cc=${encodeURIComponent(ccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
+    // Stamp
+    const now = new Date();
+    const stamp = `${now.getMonth()+1}/${now.getDate()}/${now.getFullYear()} ${now.getHours()}:${now.getMinutes().toString().padStart(2,'0')} ${now.getHours() >= 12 ? 'PM' : 'AM'}`;
+    activeJob.startEmailSentAt = stamp;
+    triggerAutoSave();
+    openJob(activeJob); // Refresh stamps
   } else {
     alert('No Client PM email available for this job. Please enter it in the spreadsheet view.');
   }
@@ -933,6 +1034,7 @@ function sortJobs(field) {
 function renderAll() {
   renderCalendar();
   renderList();
+  renderPendingReports();
   makeJobsDraggable();
   if (window.hot) updateSpreadsheetData();
 }
@@ -1044,6 +1146,9 @@ document.getElementById('addRow').onclick = () => {
     preConEmail: '',
     tbeEmail: '',
     notes: '',
+    reportSent: false,
+    reportReadySentAt: '',
+    startEmailSentAt: '',
     statusWarning: false,
     newJobFlag: false
   };
