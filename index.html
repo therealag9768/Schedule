@@ -18,20 +18,24 @@ header{padding:14px;background:#1e88e5;color:#fff;font-size:24px;font-weight:600
 #calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;width:100%;padding:0;box-sizing:border-box;grid-auto-rows:1fr;min-height:60vh;height:auto}
 .calendar-day{background:#fff;border-radius:14px;padding:8px;display:flex;flex-direction:column;height:100%;min-height:120px;box-sizing:border-box;overflow:hidden;position:relative}
 .calendar-date{font-size:clamp(16px,3vw,20px);font-weight:600;color:#444;margin-bottom:6px}
-.calendar-job{padding:4px 6px;border-radius:10px;font-size:clamp(14px,2.5vw,18px);color:#fff;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;max-height:32px;line-height:32px}
+.calendar-job{padding:4px 6px;border-radius:10px;font-size:clamp(14px,2.5vw,18px);color:#fff;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;max-height:32px;line-height:32px;font-weight:600;}
 .calendar-more{font-size:clamp(12px,2vw,14px);color:#666;margin-top:auto;text-align:center}
 #jobTableContainer{width:100%;max-width:1075px;overflow-x:auto;margin-bottom:12px}
-#jobTable{width:100%;border-collapse:collapse}
-#jobTable th,#jobTable td{padding:8px;border:1px solid #ccc;text-align:left;font-size:22px}
-#jobTable th{cursor:pointer;background:#eee}
+#jobTable{width:100%;border-collapse:collapse;margin:0;table-layout:auto}
+#jobTable th,#jobTable td{padding:6px 10px;border:1px solid #ccc;text-align:left;font-size:22px;box-sizing:border-box;line-height:1.25;vertical-align:middle}
+#jobTable th{cursor:pointer;background:#eee;font-weight:bold}
+.pending-row{background:#fff3cd;color:#856404}
+.pending-row:hover{background:#ffecb3 !important}
+.pending-row .warning{font-size:0.9em;color:#c00;font-weight:bold;display:block;margin-top:4px;padding-left:8px}
+.checked-row .checkmark {color:#28a745; font-weight:bold; margin-right:8px; display:inline;}
+.checked-row .sent-info {color:white !important; font-weight:normal; font-size:18px; display:inline;}
 .status-blue{background:#2196f3;color:#fff}
 .status-green{background:#00d27f;color:#fff}
 .status-yellow{background:#fbc02d;color:#000}
 .status-red{background:#ff5252;color:#fff}
 .status-standby{background:#d3d3d3;color:#000}
-.pending-report{background:#fff3cd;color:#856404;border-left:5px solid #ffc107}
 #detailPane{position:fixed;top:0;right:-100%;width:100%;height:100%;background:#fff;z-index:50;transition:.25s ease;overflow-y:auto;touch-action:pan-y;display:flex;flex-direction:column}
-@media(min-width:900px){#detailPane{width:50%;right:-50%}}
+@media(min-width:1000px){#detailPane{width:50%;right:-50%}}
 #detailPane.open{right:0}
 #detailHeader{padding:16px;background:#1e88e5;color:#fff;font-size:18px;font-weight:600;display:flex;align-items:center;position:relative}
 #backBtn{font-size:22px;margin-right:12px;cursor:pointer}
@@ -48,11 +52,13 @@ textarea#notes{resize:none;overflow:hidden;min-height:100px}
 .contactButtons{display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap}
 .contactButtons button{@extend .detail-pane-button}
 .delete-job-btn{background:#d32f2f !important;color:#fff;margin-top:16px;font-weight:bold;}
-.pending-section{margin-bottom:20px;border:1px solid #ffc107;background:#fff3cd;padding:10px;border-radius:8px}
-.pending-section h3{margin:0 0 10px 0;color:#856404}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#4caf50;color:white;padding:12px 24px;border-radius:8px;z-index:1000;opacity:0;transition:opacity 0.5s}
 #toast.show{opacity:1}
-@media(max-width:768px){.btnGrid{grid-template-columns:1fr;gap:10px}.contactButtons{flex-direction:column;gap:10px}}
+@media(max-width:768px){
+  .btnGrid{grid-template-columns:1fr;gap:10px}
+  .contactButtons{flex-direction:column;gap:10px}
+  .calendar-job{font-size:clamp(12px,3.2vw,16px);line-height:1.3;max-height:50px;white-space:normal;overflow:visible}
+}
 #jobSearch{margin:12px 0;padding:8px 12px;font-size:18px;border-radius:8px;border:1px solid #ccc;width:100%;max-width:1075px;box-sizing:border-box}
 #spreadsheetView{display:none;flex-direction:column;align-items:center;width:100%;padding:12px;box-sizing:border-box}
 #spreadsheetView.active{display:flex}
@@ -61,7 +67,7 @@ textarea#notes{resize:none;overflow:hidden;min-height:100px}
 #spreadsheetControls button{padding:10px 16px;border:none;border-radius:8px;background:#1e88e5;color:#fff;font-size:16px;cursor:pointer}
 #spreadsheetSearch{margin-bottom:12px;padding:8px 12px;font-size:18px;border-radius:8px;border:1px solid #ccc;width:100%;max-width:1075px;box-sizing:border-box}
 #editPane{position:fixed;top:0;right:-100%;width:100%;height:100%;background:#fff;z-index:60;transition:.25s ease;overflow-y:auto;display:flex;flex-direction:column}
-@media(min-width:900px){#editPane{width:50%;right:-50%}}
+@media(min-width:1000px){#editPane{width:50%;right:-50%}}
 #editPane.open{right:0}
 #editHeader{padding:16px;background:#1e88e5;color:#fff;font-size:18px;font-weight:600;display:flex;align-items:center}
 #editBackBtn{font-size:22px;margin-right:12px;cursor:pointer}
@@ -93,22 +99,6 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
     <button id="viewSpreadsheet">View All Jobs Spreadsheet</button>
   </div>
   <div id="jobTableContainer">
-    <div id="pendingReportsSection" class="pending-section" style="display:none;">
-      <h3>Pending Report Sent Confirmation</h3>
-      <table id="pendingTable">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Job Number</th>
-            <th>Field Ops</th>
-            <th>Start Date</th>
-            <th>Field Hours</th>
-            <th>Customer</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
     <table id="jobTable">
       <thead>
         <tr>
@@ -161,7 +151,7 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
       <button id="openAir">Open Air One</button>
       <button id="airOneSchedule">Air One Schedule</button>
       <button id="startEmail">Start Date Email</button>
-       <button id="observationsBtn">Observations</button>
+      <button id="observationsBtn">Observations</button>
       <button id="reportReady">Report Ready</button>
       <button id="jobLocation">Job Location</button>
     </div>
@@ -180,8 +170,6 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
     <span id="editBackBtn">←</span>
     <span id="editTitle">Edit Job</span>
   </div>
-
-  <!-- White background - main fields -->
   <div class="section" style="background:white; border-radius:12px; margin:12px; padding:16px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
     <label>Field Ops</label>
     <select id="editFieldOps">
@@ -191,66 +179,45 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
       <option value="Stalled">Stalled</option>
       <option value="TAB">TAB</option>
     </select>
-
     <label>Name</label>
     <input type="text" id="editName" placeholder="Job Name">
-
     <label>Job Number</label>
     <input type="text" id="editNumber" placeholder="Job Number">
-
     <label>Location</label>
     <input type="text" id="editLocation" placeholder="Location">
-
     <label>Field Hours</label>
     <input type="text" id="editHours" placeholder="Field Hours">
-
     <label>Start Date</label>
     <input type="date" id="editStartDate">
-
     <label>Scheduled Date</label>
     <input type="date" id="editScheduledDate">
-
     <label>Pre Con Email</label>
     <select id="editPreConEmail"></select>
-
     <label>TBE Email</label>
     <select id="editTbeEmail"></select>
   </div>
-
-  <!-- Dark background - manual entry overrides -->
   <div class="section" style="background:#2c2c2c; color:#eee; border-radius:12px; margin:12px; padding:16px; box-shadow:0 2px 8px rgba(0,0,0,0.3);">
     <div style="margin-bottom:12px; font-weight:600;">Manual Entry (override)</div>
-
     <label>Customer</label>
     <input type="text" id="newCustomer" placeholder="Customer name">
-
     <label>Client Project Manager</label>
     <input type="text" id="newClientProjectManager" placeholder="PM Name">
-
     <label>PM Number</label>
     <input type="text" id="newPmNumber" placeholder="Phone number">
-
     <label>PM Email</label>
     <input type="text" id="newPmEmail" placeholder="Email address">
   </div>
-
-  <!-- Light blue background - select from existing -->
   <div class="section" style="background:#e3f2fd; border-radius:12px; margin:12px; padding:16px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
     <div style="margin-bottom:12px; font-weight:600;">Select from Existing</div>
-
     <label>Customer</label>
     <select id="editCustomer"></select>
-
     <label>Client Project Manager</label>
     <select id="editClientProjectManager"></select>
-
     <label>PM Number</label>
     <input type="text" id="editPmNumber" readonly placeholder="Select name above">
-
     <label>PM Email</label>
     <input type="text" id="editPmEmail" readonly placeholder="Select name above">
   </div>
-
   <button id="saveEditBtn">Save Changes</button>
 </div>
 <div id="toast">Job number copied!</div>
@@ -273,7 +240,6 @@ let gapiInited = false;
 let gisInited = false;
 let authInProgress = false;
 let contacts = [];
-
 function gapiLoad() {
   gapi.load('client', async () => {
     try {
@@ -288,7 +254,6 @@ function gapiLoad() {
     }
   });
 }
-
 function gisLoaded() {
   try {
     tokenClient = google.accounts.oauth2.initTokenClient({
@@ -302,14 +267,12 @@ function gisLoaded() {
     console.error('GIS error:', err);
   }
 }
-
 function checkAndAutoLoad() {
   if (gapiInited && gisInited && !authInProgress) {
     loadSheetData(true);
     loadContacts(true);
   }
 }
-
 async function loadSheetData(silent = false) {
   if (!gapiInited) {
     if (!silent) alert('Google API not ready.');
@@ -367,6 +330,7 @@ async function loadSheetData(silent = false) {
         tbeEmail: r['TBE Email'] || '',
         notes: r['Notes'] || '',
         reportSent: r['Report Sent'] === 'TRUE',
+        reportSentAt: r['Report Sent At'] || '',
         reportReadySentAt: r['Report Ready Sent At'] || '',
         startEmailSentAt: r['Start Email Sent At'] || '',
         observationsSentAt: r['Observations Sent At'] || '',
@@ -381,7 +345,6 @@ async function loadSheetData(silent = false) {
     if (!silent) alert('Load failed.');
   }
 }
-
 async function loadContacts(silent = false) {
   if (!gapiInited) {
     if (!silent) alert('Google API not ready for Contacts.');
@@ -407,7 +370,6 @@ async function loadContacts(silent = false) {
     console.error('Contacts load error:', err);
   }
 }
-
 async function saveToSheet(silent = false) {
   if (authInProgress) return;
   authInProgress = true;
@@ -428,7 +390,7 @@ async function saveToSheet(silent = false) {
 }
 async function performSave(silent = false) {
   try {
-    const headers = ['Name','Job Number','Field Ops','Field Hours','Start Date','Scheduled Date','Customer','Client Project Manager','PM Number','PM Email','Location','Pre Con Email','TBE Email','Notes','Report Sent','Report Ready Sent At','Start Email Sent At','Observations Sent At'];
+    const headers = ['Name','Job Number','Field Ops','Field Hours','Start Date','Scheduled Date','Customer','Client Project Manager','PM Number','PM Email','Location','Pre Con Email','TBE Email','Notes','Report Sent','Report Sent At','Report Ready Sent At','Start Email Sent At','Observations Sent At'];
     const values = [headers];
     jobs.forEach(j => {
       values.push([
@@ -447,6 +409,7 @@ async function performSave(silent = false) {
         j.tbeEmail || '',
         j.notes || '',
         j.reportSent ? 'TRUE' : 'FALSE',
+        j.reportSentAt || '',
         j.reportReadySentAt || '',
         j.startEmailSentAt || '',
         j.observationsSentAt || ''
@@ -591,6 +554,7 @@ document.addEventListener('click', e => {
       tbeEmail: '',
       notes: '',
       reportSent: false,
+      reportSentAt: '',
       reportReadySentAt: '',
       startEmailSentAt: '',
       observationsSentAt: '',
@@ -605,31 +569,35 @@ function renderList(filteredJobs) {
   const tbody = document.querySelector('#jobTable tbody');
   tbody.innerHTML = '';
   const listToRender = filteredJobs || jobs;
-  listToRender.forEach(j => {
-    const warningIcon = j.statusWarning ? '⚠️ ' : (j.newJobFlag ? '🔴 ' : '');
+
+  // Split into pending and normal
+  const pending = listToRender.filter(j => j.status === 'Complete' && !j.reportSent);
+  const normal = listToRender.filter(j => !(j.status === 'Complete' && !j.reportSent));
+
+  // Render pending jobs first (yellow row, caution under name)
+  pending.forEach(j => {
     const tr = document.createElement('tr');
-    tr.className = statusClass(j.status || j.fieldOps);
-    tr.innerHTML = `<td>${warningIcon}${j.name||''}</td><td>${j.number||''}</td><td>${j.fieldOps||''}</td><td>${j.startDate||''}</td><td>${j.hours||''}</td><td>${j.customer||''}</td>`;
+    tr.className = 'pending-row';
+    const nameContent = `
+      ${j.name || ''}<br>
+      <span class="warning">⚠️ Report sent?</span>
+    `;
+    tr.innerHTML = `<td>${nameContent}</td><td>${j.number||''}</td><td>${j.fieldOps||''}</td><td>${j.startDate||''}</td><td>${j.hours||''}</td><td>${j.customer||''}</td>`;
     tr.onclick = () => openJob(j);
     tbody.appendChild(tr);
   });
-}
-function renderPendingReports() {
-  const pendingSection = document.getElementById('pendingReportsSection');
-  const pendingTbody = document.querySelector('#pendingTable tbody');
-  pendingTbody.innerHTML = '';
-  const pendingJobs = jobs.filter(j => j.status === 'Complete' && !j.reportSent);
-  if (pendingJobs.length === 0) {
-    pendingSection.style.display = 'none';
-    return;
-  }
-  pendingSection.style.display = 'block';
-  pendingJobs.forEach(j => {
+
+  // Render normal jobs — check + timestamp BESIDE each other under name
+  normal.forEach(j => {
+    const warningIcon = j.statusWarning ? '⚠️ ' : (j.newJobFlag ? '🔴 ' : '');
+    const checkContent = j.reportSent ? `
+      <br><span class="checkmark">✅</span><span class="sent-info"> ${j.reportSentAt || ''}</span>
+    ` : '';
     const tr = document.createElement('tr');
-    tr.className = 'pending-report';
-    tr.innerHTML = `<td>${j.name||''} ⚠️REPORT SENT?</td><td>${j.number||''}</td><td>${j.fieldOps||''}</td><td>${j.startDate||''}</td><td>${j.hours||''}</td><td>${j.customer||''}</td>`;
+    tr.className = statusClass(j.status || j.fieldOps) + (j.reportSent ? ' checked-row' : '');
+    tr.innerHTML = `<td>${warningIcon}${j.name||''}${checkContent}</td><td>${j.number||''}</td><td>${j.fieldOps||''}</td><td>${j.startDate||''}</td><td>${j.hours||''}</td><td>${j.customer||''}</td>`;
     tr.onclick = () => openJob(j);
-    pendingTbody.appendChild(tr);
+    tbody.appendChild(tr);
   });
 }
 function openJob(j) {
@@ -661,7 +629,7 @@ function openJob(j) {
   const toggle = document.getElementById('reportSentToggle');
   toggle.checked = j.reportSent || false;
   detailPane.classList.add('open');
-  renderPendingReports();
+  renderList(); // Refresh table to show updated status
 }
 document.getElementById('notes').addEventListener('input', () => {
   if (activeJob) {
@@ -672,9 +640,23 @@ document.getElementById('notes').addEventListener('input', () => {
 });
 document.getElementById('reportSentToggle').addEventListener('change', (e) => {
   if (activeJob) {
+    const now = new Date();
+    const timeStr = now.toLocaleString('en-US', {
+      month: 'numeric',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
     activeJob.reportSent = e.target.checked;
+    if (activeJob.reportSent) {
+      activeJob.reportSentAt = timeStr;
+    } else {
+      activeJob.reportSentAt = '';
+    }
     triggerAutoSave();
-    renderPendingReports();
+    renderList(); // Immediate refresh of the table
   }
 });
 function getUnique(field) {
@@ -693,13 +675,11 @@ function populateSelect(id, field) {
 function openEditPane() {
   if (!activeJob) return;
   document.getElementById('editTitle').textContent = `Edit: ${activeJob.name || 'Job'}`;
-
   document.getElementById('editFieldOps').value = activeJob.fieldOps || 'TAB';
   document.getElementById('editName').value = activeJob.name || '';
   document.getElementById('editNumber').value = activeJob.number || '';
   document.getElementById('editLocation').value = activeJob.location || '';
   document.getElementById('editHours').value = activeJob.hours || '';
-
   let startIso = '';
   if (activeJob.startDate) {
     const parts = activeJob.startDate.split('/');
@@ -708,7 +688,6 @@ function openEditPane() {
     }
   }
   document.getElementById('editStartDate').value = startIso;
-
   let schedIso = '';
   if (activeJob.scheduledDate) {
     const parts = activeJob.scheduledDate.split('/');
@@ -719,15 +698,12 @@ function openEditPane() {
     schedIso = startIso;
   }
   document.getElementById('editScheduledDate').value = schedIso;
-
   populateSelect('editPreConEmail', 'preConEmail');
   populateSelect('editTbeEmail', 'tbeEmail');
   document.getElementById('editPreConEmail').value = activeJob.preConEmail || '';
   document.getElementById('editTbeEmail').value = activeJob.tbeEmail || '';
-
   populateSelect('editCustomer', 'customer');
   document.getElementById('editCustomer').value = activeJob.customer || '';
-
   const pmSelect = document.getElementById('editClientProjectManager');
   pmSelect.innerHTML = '<option value="">-- Select PM --</option>';
   const pmNames = [...new Set(contacts.map(c => c['Client Project Manager'] || '').filter(Boolean))].sort();
@@ -738,7 +714,6 @@ function openEditPane() {
     pmSelect.appendChild(opt);
   });
   pmSelect.value = activeJob.clientProjectManager || '';
-
   if (activeJob.clientProjectManager) {
     const contact = contacts.find(c => c['Client Project Manager'] === activeJob.clientProjectManager);
     if (contact) {
@@ -746,15 +721,12 @@ function openEditPane() {
       document.getElementById('editPmEmail').value = contact['PM Email'] || '';
     }
   }
-
   document.getElementById('newCustomer').value = '';
   document.getElementById('newClientProjectManager').value = '';
   document.getElementById('newPmNumber').value = '';
   document.getElementById('newPmEmail').value = '';
-
   editPane.classList.add('open');
 }
-
 document.addEventListener('DOMContentLoaded', () => {
   const pmSelect = document.getElementById('editClientProjectManager');
   if (pmSelect) {
@@ -776,23 +748,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
-
 function saveEditPane() {
   if (!activeJob) return;
-
   activeJob.fieldOps = document.getElementById('editFieldOps').value || activeJob.fieldOps;
   activeJob.status = activeJob.fieldOps;
   activeJob.name = document.getElementById('editName').value.trim() || activeJob.name;
   activeJob.number = document.getElementById('editNumber').value.trim() || activeJob.number;
   activeJob.location = document.getElementById('editLocation').value.trim() || activeJob.location;
   activeJob.hours = document.getElementById('editHours').value.trim() || activeJob.hours;
-
   let startDateVal = document.getElementById('editStartDate').value;
   if (startDateVal) {
     const parts = startDateVal.split('-');
     activeJob.startDate = `${parseInt(parts[1],10)}/${parseInt(parts[2],10)}/${parts[0]}`;
   }
-
   let schedDateVal = document.getElementById('editScheduledDate').value;
   if (schedDateVal) {
     const parts = schedDateVal.split('-');
@@ -800,31 +768,22 @@ function saveEditPane() {
   } else {
     activeJob.scheduledDate = activeJob.startDate;
   }
-
   activeJob.preConEmail = document.getElementById('editPreConEmail').value || activeJob.preConEmail;
   activeJob.tbeEmail = document.getElementById('editTbeEmail').value || activeJob.tbeEmail;
-
   const customer = document.getElementById('editCustomer').value.trim();
   if (customer) activeJob.customer = customer;
-
   const pmName = document.getElementById('editClientProjectManager').value.trim();
   if (pmName) activeJob.clientProjectManager = pmName;
-
   activeJob.pmNumber = document.getElementById('editPmNumber').value.trim() || activeJob.pmNumber;
   activeJob.pmEmail = document.getElementById('editPmEmail').value.trim() || activeJob.pmEmail;
-
   const manualCustomer = document.getElementById('newCustomer').value.trim();
   if (manualCustomer) activeJob.customer = manualCustomer;
-
   const manualPM = document.getElementById('newClientProjectManager').value.trim();
   if (manualPM) activeJob.clientProjectManager = manualPM;
-
   const manualPhone = document.getElementById('newPmNumber').value.trim();
   if (manualPhone) activeJob.pmNumber = manualPhone;
-
   const manualEmail = document.getElementById('newPmEmail').value.trim();
   if (manualEmail) activeJob.pmEmail = manualEmail;
-
   editPane.classList.remove('open');
   renderAll();
   triggerAutoSave();
@@ -889,6 +848,7 @@ function triggerFileInput() {
             tbeEmail: r['TBE Email'] || '',
             notes: '',
             reportSent: false,
+            reportSentAt: '',
             reportReadySentAt: '',
             startEmailSentAt: '',
             observationsSentAt: '',
@@ -950,10 +910,7 @@ document.getElementById('emailPM').onclick = () => {
     firstName = nameParts[0] || 'All';
   }
   const body = `${firstName},
-
-
 Thank you,
-
 `;
   window.open(`mailto:${encodeURIComponent(pmEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
 };
@@ -994,16 +951,12 @@ document.getElementById('reportReady').onclick = () => {
   const ccList = 'dfunchess@palmettoairbalance.com';
   const subject = `✅ ${activeJob.name || ''} ${activeJob.number || ''}`;
   const body = `All,
-
 1.) Job is complete.
 2.) Synopsis added.
 3.) No changes to drawings.
 4.) Report data is ready for TBE review.
 5.) Job has or does not have an engineer stamp. Guarantee ?
-
-
 Thank you,
-
 `;
   const mailtoLink = `mailto:${recipients ? encodeURIComponent(recipients) : ''}?cc=${encodeURIComponent(ccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.open(mailtoLink, '_blank');
@@ -1027,12 +980,8 @@ document.getElementById('observationsBtn').onclick = () => {
     firstName = nameParts[0] || 'All';
   }
   const body = `${firstName},
-
 See attached observations. Please select or fill out each item with a response and send back to us here. This will ensure we are only checking items that are ready to re-check.
-
-
 Thank you,
-
 `;
   window.open(`mailto:${encodeURIComponent(pmEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
   const now = new Date();
@@ -1054,29 +1003,22 @@ document.getElementById('startEmail').onclick = () => {
   }
   const subject = `🔴 ${activeJob.name || ''} ${activeJob.number || ''}`;
   const body = `${firstName},
-
 I am the Project Manager for test and balance on this project.
 Please provide the following listed below for Test and Balance(TAB):
-
 SEND TO ME:
 🔴(Tentative start date for TAB)
 🔴(Project completion date for TAB)
 🔴(Pre TAB Checklist) Link➔ https://shorturl.at/LkY45
-
 SEND TO OUR PRECONSTRUCTION TEAM (IF NOT SENT ALREADY): dfunchess@palmettoairbalance.com
 🔴(TAB Specs and Tolerances)
 🔴(Equipment submittals)
 🔴(Final approved construction mechanical drawings to be used)
 Any important job requirements or information to help ensure a successful start is greatly appreciated!
-
 𝐍𝐎𝐓𝐄:
 • We schedule every Thursday for the following week.
 • If a start date has been requested, we will contact you on our scheduling day to confirm.
 • If you do not respond to confirm the schedule, your project will not be scheduled.
-
-
 Thank you,
-
 `;
   if (pmEmail) {
     window.open(`mailto:${encodeURIComponent(pmEmail)}?cc=${encodeURIComponent(ccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
@@ -1092,7 +1034,7 @@ Thank you,
 document.getElementById('deleteJobBtn').onclick = function() {
   if (!activeJob) return;
   if (!confirm(`Delete job "${activeJob.name || 'Unnamed'} ${activeJob.number || ''}" permanently?`)) return;
-  
+ 
   const index = jobs.indexOf(activeJob);
   if (index > -1) {
     jobs.splice(index, 1);
@@ -1129,7 +1071,6 @@ function sortJobs(field) {
 function renderAll() {
   renderCalendar();
   renderList();
-  renderPendingReports();
   makeJobsDraggable();
   if (window.hot) updateSpreadsheetData();
 }
@@ -1173,19 +1114,15 @@ function initSpreadsheet() {
           name: 'Delete this job (row)',
           callback: function(key, selection) {
             if (!confirm('Are you sure you want to permanently delete this job row?')) return;
-
             const visualRow = selection[0].start.row;
             if (visualRow === 0) return;
-
             const filtered = getFilteredJobs(document.getElementById('spreadsheetSearch').value);
             const jobToDelete = filtered[visualRow - 1];
             if (!jobToDelete) return;
-
             const realIndex = jobs.indexOf(jobToDelete);
             if (realIndex !== -1) {
               jobs.splice(realIndex, 1);
             }
-
             updateSpreadsheetData();
             if (activeJob === jobToDelete) {
               document.getElementById('detailPane').classList.remove('open');
@@ -1197,8 +1134,8 @@ function initSpreadsheet() {
         }
       }
     },
-    cells: function(row, col) { 
-      if (row === 0) return { readOnly: true, className: 'htHeader' }; 
+    cells: function(row, col) {
+      if (row === 0) return { readOnly: true, className: 'htHeader' };
     },
     afterChange: function(changes, source) {
       if (source === 'loadData' || !changes) return;
@@ -1242,6 +1179,7 @@ document.getElementById('addRow').onclick = () => {
     tbeEmail: '',
     notes: '',
     reportSent: false,
+    reportSentAt: '',
     reportReadySentAt: '',
     startEmailSentAt: '',
     observationsSentAt: '',
@@ -1267,6 +1205,3 @@ renderAll();
 </script>
 </body>
 </html>
-
-
-
