@@ -969,7 +969,8 @@ document.getElementById('emailPM').onclick = () => {
   const body = `${firstName},
 `;
 Thank you,
-`;
+
+
 `;
   window.open(`mailto:${encodeURIComponent(pmEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
 };
@@ -1016,10 +1017,11 @@ document.getElementById('reportReady').onclick = () => {
 3.) No changes to drawings.
 4.) Report data is ready for TBE review.
 5.) Job has or does not have an engineer stamp. Guarantee ?
-`;
-`;
+
+
 Thank you,
-`;
+
+
 `; 
   const mailtoLink = `mailto:${recipients ? encodeURIComponent(recipients) : ''}?cc=${encodeURIComponent(ccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.open(mailtoLink, '_blank');
@@ -1045,10 +1047,11 @@ document.getElementById('observationsBtn').onclick = () => {
   const body = `${firstName},
 `; 
 See attached observations. Please select or fill out each item with a response and send back to us here. This will ensure we are only checking items that are ready to re-check.
-`;
-`;
+
+
 Thank you,
-`;
+
+
 `; 
   window.open(`mailto:${encodeURIComponent(pmEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
   const now = new Date();
@@ -1279,4 +1282,5 @@ renderAll();
 </script>
 </body>
 </html>
+
 
