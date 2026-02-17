@@ -985,9 +985,9 @@ document.getElementById('emailPM').onclick = () => {
     firstName = nameParts[0] || 'All';
   }
   const body = `${firstName},
+
  
 Thank you,
-
 
 `;
   window.open(`mailto:${encodeURIComponent(pmEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
@@ -1044,8 +1044,8 @@ document.getElementById('reportReady').onclick = () => {
 4.) Report data is ready for TBE review.
 5.) Job has or does not have an engineer stamp. Guarantee ?
 
-Thank you,
 
+Thank you,
 
 `;
   const mailtoLink = `mailto:${recipients ? encodeURIComponent(recipients) : ''}?cc=${encodeURIComponent(ccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -1080,8 +1080,8 @@ document.getElementById('observationsBtn').onclick = () => {
  
 See attached observations. Please select or fill out each item with a response and send back to us here. This will ensure we are only checking items that are ready to re-check.
 
-Thank you,
 
+Thank you,
 
 `;
   window.open(`mailto:${encodeURIComponent(pmEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
@@ -1132,8 +1132,8 @@ Any important job requirements or information to help ensure a successful start 
 • If a start date has been requested, we will contact you on our scheduling day to confirm.
 • If you do not respond to confirm the schedule, your project will not be scheduled.
 
-Thank you,
 
+Thank you,
 
 `;
   if (pmEmail) {
@@ -1327,4 +1327,5 @@ renderAll();
 </script>
 </body>
 </html>
+
 
