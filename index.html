@@ -631,21 +631,38 @@ function renderList(filteredJobs) {
   const tbody = document.querySelector('#jobTable tbody');
   tbody.innerHTML = '';
   const listToRender = filteredJobs || jobs;
-  const pending = listToRender.filter(j => j.status === 'Complete' && !j.reportSent);
-  const normal = listToRender.filter(j => !(j.status === 'Complete' && !j.reportSent));
-  pending.forEach(j => {
+
+  // NEW: Show new jobs (red circle 🔴) at the very top
+  const newJobs = listToRender.filter(j => j.newJobFlag === true);
+  const pending = listToRender.filter(j => !j.newJobFlag && j.status === 'Complete' && !j.reportSent);
+  const normal = listToRender.filter(j => !j.newJobFlag && !(j.status === 'Complete' && !j.reportSent));
+
+  // Render new jobs first
+  newJobs.forEach(j => {
+    const warningIcon = '🔴 ';
     const tr = document.createElement('tr');
-    tr.className = 'pending-row';
+    tr.className = statusClass(j.status || j.fieldOps);
+    tr.innerHTML = `<td>${warningIcon}${j.name||''}</td><td>${j.number||''}</td><td>${j.fieldOps||''}</td><td>${j.startDate||''}</td><td>${j.hours||''}</td><td>${j.customer||''}</td>`;
+    tr.onclick = () => openJob(j);
+    tbody.appendChild(tr);
+  });
+
+  // Then pending rows
+  pending.forEach(j => {
     const nameContent = `
       ${j.name || ''}<br>
       <span class="warning">⚠️ Report sent?</span>
     `;
+    const tr = document.createElement('tr');
+    tr.className = 'pending-row';
     tr.innerHTML = `<td>${nameContent}</td><td>${j.number||''}</td><td>${j.fieldOps||''}</td><td>${j.startDate||''}</td><td>${j.hours||''}</td><td>${j.customer||''}</td>`;
     tr.onclick = () => openJob(j);
     tbody.appendChild(tr);
   });
+
+  // Then normal rows
   normal.forEach(j => {
-    const warningIcon = j.statusWarning ? '⚠️ ' : (j.newJobFlag ? '🔴 ' : '');
+    const warningIcon = j.statusWarning ? '⚠️ ' : '';
     const checkContent = j.reportSent ? `
       <br><span class="checkmark">✅</span><span class="sent-info"> ${j.reportSentAt || ''}</span>
     ` : '';
@@ -911,7 +928,7 @@ function triggerFileInput() {
             startEmailSentAt: '',
             observationsSentAt: '',
             statusWarning: false,
-            newJobFlag: !!jobNumber  // only true if it has a number and is new
+            newJobFlag: !!jobNumber // only true if it has a number and is new
           };
           jobs.push(newJob);
           if (jobNumber) existingNumbers.add(jobNumber);
@@ -968,7 +985,7 @@ document.getElementById('emailPM').onclick = () => {
     firstName = nameParts[0] || 'All';
   }
   const body = `${firstName},
-  
+ 
 Thank you,
 `;
   window.open(`mailto:${encodeURIComponent(pmEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
@@ -992,7 +1009,15 @@ document.getElementById('copyJob').onclick = () => {
     });
   }
 };
-document.getElementById('openAir').onclick = () => window.open('https://airone.palmettoairbalance.com/project_management/projects/','_blank');
+document.getElementById('openAir').onclick = () => {
+  if (activeJob && activeJob.number) {
+    const jobNum = activeJob.number.trim();
+    const url = `https://airone.palmettoairbalance.com/project_management/projects/?q=${encodeURIComponent(jobNum)}`;
+    window.open(url, '_blank');
+  } else {
+    window.open('https://airone.palmettoairbalance.com/project_management/projects/','_blank');
+  }
+};
 document.getElementById('airOneSchedule').onclick = () => window.open('https://airone.palmettoairbalance.com/scheduling/tech/','_blank');
 document.getElementById('jobLocation').onclick = () => {
   if (activeJob) {
@@ -1010,13 +1035,11 @@ document.getElementById('reportReady').onclick = () => {
   const ccList = 'dfunchess@palmettoairbalance.com';
   const subject = `✅ ${activeJob.name || ''} ${activeJob.number || ''}`;
   const body = `All,
- 
 1.) Job is complete.
 2.) Synopsis added.
 3.) No changes to drawings.
 4.) Report data is ready for TBE review.
 5.) Job has or does not have an engineer stamp. Guarantee ?
-
 Thank you,
 `;
   const mailtoLink = `mailto:${recipients ? encodeURIComponent(recipients) : ''}?cc=${encodeURIComponent(ccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -1048,9 +1071,8 @@ document.getElementById('observationsBtn').onclick = () => {
     firstName = nameParts[0] || 'All';
   }
   const body = `${firstName},
-  
+ 
 See attached observations. Please select or fill out each item with a response and send back to us here. This will ensure we are only checking items that are ready to re-check.
-
 Thank you,
 `;
   window.open(`mailto:${encodeURIComponent(pmEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
@@ -1080,28 +1102,21 @@ document.getElementById('startEmail').onclick = () => {
   }
   const subject = `🔴 ${activeJob.name || ''} ${activeJob.number || ''}`;
   const body = `${firstName},
- 
 I am the Project Manager for test and balance on this project.
 Please provide the following listed below for Test and Balance(TAB):
-
 SEND TO ME:
 🔴(Tentative start date for TAB)
 🔴(Project completion date for TAB)
 🔴(Pre TAB Checklist) Link➔ https://shorturl.at/LkY45
-
 SEND TO OUR PRECONSTRUCTION TEAM (IF NOT SENT ALREADY): dfunchess@palmettoairbalance.com
 🔴(TAB Specs and Tolerances)
 🔴(Equipment submittals)
 🔴(Final approved construction mechanical drawings to be used)
-
 Any important job requirements or information to help ensure a successful start is greatly appreciated!
-
 𝐍𝐎𝐓𝐄:
 • We schedule every Thursday for the following week.
 • If a start date has been requested, we will contact you on our scheduling day to confirm.
 • If you do not respond to confirm the schedule, your project will not be scheduled.
-
-
 Thank you,
 `;
   if (pmEmail) {
