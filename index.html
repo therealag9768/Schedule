@@ -5,6 +5,10 @@
 <title>Schedule App</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <style>
+  html, body {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 #reportSentToggle {
   width: 18px !important;
   height: 18px !important;
@@ -114,7 +118,17 @@ textarea#notes{resize:none;overflow:hidden;min-height:100px;}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#4caf50;color:white;padding:12px 24px;border-radius:8px;z-index:1000;opacity:0;transition:opacity 0.5s}
 #toast.show{opacity:1}
 #jobSearch, #spreadsheetSearch {
-  margin:12px 0;padding:8px 12px;font-size:16px !important;border-radius:8px;border:1px solid #ccc;width:100%;max-width:1075px;box-sizing:border-box
+  margin:12px 0;
+  padding:12px 12px;
+  font-size:16px !important;
+  line-height: 1.0 !important;
+  border-radius:8px;
+  border:1px solid #ccc;
+  width:100%;
+  max-width:1075px;
+  box-sizing:border-box;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 #spreadsheetView{display:none;flex-direction:column;align-items:center;width:100%;padding:12px;box-sizing:border-box}
 #spreadsheetView.active{display:flex}
