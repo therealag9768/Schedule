@@ -300,6 +300,7 @@ let gisInited = false;
 let authInProgress = false;
 let pendingSaveAfterAuth = false;
 let contacts = [];
+let hasUnsavedChanges = false;
 function ensureGoogleScripts() {
   if (!document.querySelector('script[src*="apis.google.com/js/api.js"]')) {
     const s = document.createElement('script');
@@ -410,6 +411,7 @@ async function loadSheetDataViaFetch(silent = false) {
   }
 }
 function applySheetRows(rows, silent) {
+  if (silent && hasUnsavedChanges) return;
   if (!rows || rows.length === 0) {
     if (!silent) alert('No data found.');
     return;
@@ -563,6 +565,7 @@ async function performSave(silent = false) {
       valueInputOption: 'RAW',
       resource: { values }
     });
+    hasUnsavedChanges = false;
     if (!silent) alert('Saved!');
     else showToast('Saved to Google Sheet');
   } catch (err) {
@@ -584,24 +587,27 @@ async function performSave(silent = false) {
 }
 let autoSaveTimeout;
 function triggerAutoSave() {
+  hasUnsavedChanges = true;
   clearTimeout(autoSaveTimeout);
-  autoSaveTimeout = setTimeout(() => saveToSheet(true), 2000);
+  autoSaveTimeout = setTimeout(() => saveToSheet(true), 4000);
 }
-document.getElementById('loadSheet').onclick = () => loadSheetData(false);
+function maybeReloadFromSheet() {
+  if (hasUnsavedChanges || authInProgress || pendingSaveAfterAuth) return;
+  loadSheetData(true);
+  loadContacts(true);
+}
+document.getElementById('loadSheet').onclick = () => {
+  hasUnsavedChanges = false;
+  loadSheetData(false);
+};
 document.getElementById('saveSheet').onclick = () => saveToSheet(false);
 gapiLoad();
 if (window.google && google.accounts && google.accounts.oauth2) gisLoaded();
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
-    loadSheetData(true);
-    loadContacts(true);
-  }
+  if (document.visibilityState === 'visible') maybeReloadFromSheet();
 });
-window.addEventListener('pageshow', () => {
-  if (gapiInited) {
-    loadSheetData(true);
-    loadContacts(true);
-  }
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted) maybeReloadFromSheet();
 });
 // === BASELINE CODE ===
 const jobs = [];
@@ -983,8 +989,9 @@ function saveEditPane() {
   if (manualEmail) activeJob.pmEmail = manualEmail;
   editPane.classList.remove('open');
   renderAll();
-  triggerAutoSave();
+  hasUnsavedChanges = true;
   openJob(activeJob);
+  saveToSheet(false);
 }
 function triggerFileInput() {
   const input = document.createElement('input');
