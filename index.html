@@ -865,15 +865,28 @@ document.getElementById('reportSentToggle').addEventListener('change', (e) => {
 function getUnique(field) {
   return [...new Set(jobs.map(j => j[field] || '').filter(v => v.trim()))].sort();
 }
-function populateSelect(id, field) {
+function populateSelect(id, field, extraValue) {
   const select = document.getElementById(id);
   select.innerHTML = '<option value="">-- Select --</option>';
-  getUnique(field).forEach(val => {
+  const vals = getUnique(field);
+  if (extraValue && !vals.includes(extraValue)) vals.unshift(extraValue);
+  vals.forEach(val => {
     const opt = document.createElement('option');
     opt.value = val;
     opt.textContent = val;
     select.appendChild(opt);
   });
+}
+function setSelectValue(id, value) {
+  const select = document.getElementById(id);
+  const val = value || '';
+  if (val && ![...select.options].some(o => o.value === val)) {
+    const opt = document.createElement('option');
+    opt.value = val;
+    opt.textContent = val;
+    select.appendChild(opt);
+  }
+  select.value = val;
 }
 function openEditPane() {
   if (!activeJob) return;
@@ -901,33 +914,33 @@ function openEditPane() {
     schedIso = startIso;
   }
   document.getElementById('editScheduledDate').value = schedIso;
-  populateSelect('editPreConEmail', 'preConEmail');
-  populateSelect('editTbeEmail', 'tbeEmail');
-  document.getElementById('editPreConEmail').value = activeJob.preConEmail || '';
-  document.getElementById('editTbeEmail').value = activeJob.tbeEmail || '';
-  populateSelect('editCustomer', 'customer');
-  document.getElementById('editCustomer').value = activeJob.customer || '';
+  populateSelect('editPreConEmail', 'preConEmail', activeJob.preConEmail);
+  populateSelect('editTbeEmail', 'tbeEmail', activeJob.tbeEmail);
+  setSelectValue('editPreConEmail', activeJob.preConEmail);
+  setSelectValue('editTbeEmail', activeJob.tbeEmail);
+  populateSelect('editCustomer', 'customer', activeJob.customer);
+  setSelectValue('editCustomer', activeJob.customer);
   const pmSelect = document.getElementById('editClientProjectManager');
   pmSelect.innerHTML = '<option value="">-- Select PM --</option>';
-  const pmNames = [...new Set(contacts.map(c => c['Client Project Manager'] || '').filter(Boolean))].sort();
+  const pmNames = [...new Set([
+    activeJob.clientProjectManager || '',
+    ...contacts.map(c => c['Client Project Manager'] || ''),
+    ...jobs.map(j => j.clientProjectManager || '')
+  ].filter(Boolean))].sort();
   pmNames.forEach(name => {
     const opt = document.createElement('option');
     opt.value = name;
     opt.textContent = name;
     pmSelect.appendChild(opt);
   });
-  pmSelect.value = activeJob.clientProjectManager || '';
-  if (activeJob.clientProjectManager) {
-    const contact = contacts.find(c => c['Client Project Manager'] === activeJob.clientProjectManager);
-    if (contact) {
-      document.getElementById('editPmNumber').value = contact['PM Number'] || '';
-      document.getElementById('editPmEmail').value = contact['PM Email'] || '';
-    }
-  }
-  document.getElementById('newCustomer').value = '';
-  document.getElementById('newClientProjectManager').value = '';
-  document.getElementById('newPmNumber').value = '';
-  document.getElementById('newPmEmail').value = '';
+  setSelectValue('editClientProjectManager', activeJob.clientProjectManager);
+  const contact = contacts.find(c => c['Client Project Manager'] === (activeJob.clientProjectManager || ''));
+  document.getElementById('editPmNumber').value = activeJob.pmNumber || (contact && contact['PM Number']) || '';
+  document.getElementById('editPmEmail').value = activeJob.pmEmail || (contact && contact['PM Email']) || '';
+  document.getElementById('newCustomer').value = activeJob.customer || '';
+  document.getElementById('newClientProjectManager').value = activeJob.clientProjectManager || '';
+  document.getElementById('newPmNumber').value = activeJob.pmNumber || '';
+  document.getElementById('newPmEmail').value = activeJob.pmEmail || '';
   editPane.classList.add('open');
 }
 document.addEventListener('DOMContentLoaded', () => {
@@ -941,13 +954,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       const contact = contacts.find(c => c['Client Project Manager'] === selectedName);
-      if (contact) {
-        document.getElementById('editPmNumber').value = contact['PM Number'] || '';
-        document.getElementById('editPmEmail').value = contact['PM Email'] || '';
-      } else {
-        document.getElementById('editPmNumber').value = '';
-        document.getElementById('editPmEmail').value = '';
-      }
+      const sameJob = jobs.find(j => j.clientProjectManager === selectedName && (j.pmNumber || j.pmEmail));
+      document.getElementById('editPmNumber').value = (contact && contact['PM Number']) || (sameJob && sameJob.pmNumber) || '';
+      document.getElementById('editPmEmail').value = (contact && contact['PM Email']) || (sameJob && sameJob.pmEmail) || '';
     });
   }
 });
