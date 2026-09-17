@@ -3,22 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <title>Schedule App</title>
-<meta name="viewport" content="width=device-width, initial-scale=0.4, minimum-scale=0.4, maximum-scale=0.4, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">
 <style>
-/* BLOCK ALL ZOOMING */
-html, body {
-  -webkit-text-size-adjust: none !important;
-  text-size-adjust: none !important;
-  -webkit-user-scalable: none !important;
-  user-scalable: no !important;
-}
-
-#jobSearch, #spreadsheetSearch {
-  margin:12px 0;
-  padding:12px 12px;
-  font-size:16px !important;
-  line-height:1.0 !important;
-}
 #reportSentToggle {
   width: 18px !important;
   height: 18px !important;
@@ -127,19 +113,8 @@ textarea#notes{resize:none;overflow:hidden;min-height:100px;}
 .contactButtons{display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#4caf50;color:white;padding:12px 24px;border-radius:8px;z-index:1000;opacity:0;transition:opacity 0.5s}
 #toast.show{opacity:1}
-#jobSearch, #spreadsheetSearch {
-  margin:12px 0;
-  padding:12px 12px;
-  font-size:16px !important;
-  line-height: 1.0 !important;
-  border-radius:8px;
-  border:1px solid #ccc;
-  width:100%;
-  max-width:1075px;
-  box-sizing:border-box;
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-}
+#jobSearch{margin:12px 0;padding:8px 12px;font-size:18px;border-radius:8px;border:1px solid #ccc;width:100%;max-width:1075px;box-sizing:border-box}
+#hideCompletedToggle{width:20px;height:20px;accent-color:#1e88e5;cursor:pointer}
 #spreadsheetView{display:none;flex-direction:column;align-items:center;width:100%;padding:12px;box-sizing:border-box}
 #spreadsheetView.active{display:flex}
 #spreadsheetContainer{width:100%;max-width:1075px;height:70vh;border:1px solid #ccc;border-radius:8px;overflow:hidden;background:#fff;}
@@ -160,7 +135,7 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css">
 <script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
 <script src="https://apis.google.com/js/api.js"></script>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="gisLoaded()"></script>
 </head>
 <body>
 <header>Schedule App</header>
@@ -171,6 +146,10 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
   </div>
   <div id="calendarContainer"><div id="calendar"></div></div>
   <input type="text" id="jobSearch" placeholder="Search jobs by name, number, or customer...">
+  <label id="hideCompletedLabel" style="display:flex;align-items:center;gap:10px;margin:0 0 12px;font-size:18px;font-weight:600;cursor:pointer;user-select:none">
+    <input type="checkbox" id="hideCompletedToggle">
+    Hide completed jobs
+  </label>
   <div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;justify-content:center">
     <button id="uploadCSV">Upload CSV / XLS</button>
     <button id="downloadAirOne">Download Air One XLS</button>
@@ -319,8 +298,30 @@ let tokenClient;
 let gapiInited = false;
 let gisInited = false;
 let authInProgress = false;
+let pendingSaveAfterAuth = false;
 let contacts = [];
+function ensureGoogleScripts() {
+  if (!document.querySelector('script[src*="apis.google.com/js/api.js"]')) {
+    const s = document.createElement('script');
+    s.src = 'https://apis.google.com/js/api.js';
+    document.head.appendChild(s);
+  }
+  if (!document.querySelector('script[src*="accounts.google.com/gsi/client"]')) {
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.async = true;
+    s.defer = true;
+    s.onload = gisLoaded;
+    document.head.appendChild(s);
+  }
+}
 function gapiLoad() {
+  ensureGoogleScripts();
+  if (!window.gapi) {
+    setTimeout(gapiLoad, 200);
+    return;
+  }
+  if (gapiInited) return;
   gapi.load('client', async () => {
     try {
       await gapi.client.init({
@@ -328,34 +329,147 @@ function gapiLoad() {
         discoveryDocs: [DISCOVERY_DOC],
       });
       gapiInited = true;
-      checkAndAutoLoad();
+      loadSheetData(true);
+      loadContacts(true);
     } catch (err) {
       console.error('GAPI error:', err);
+      loadSheetDataViaFetch(true);
     }
+  });
+}
+function waitForGoogleReady(timeoutMs = 8000) {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    (function tick() {
+      if (gapiInited && tokenClient) return resolve(true);
+      gapiLoad();
+      gisLoaded();
+      if (Date.now() - start >= timeoutMs) return resolve(!!gapiInited);
+      setTimeout(tick, 200);
+    })();
   });
 }
 function gisLoaded() {
   try {
+    if (!window.google || !google.accounts || !google.accounts.oauth2) {
+      setTimeout(gisLoaded, 200);
+      return;
+    }
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
       scope: SCOPES,
-      callback: '',
+      callback: (resp) => {
+        authInProgress = false;
+        if (resp && resp.error) {
+          console.error('Auth error:', resp);
+          showToast('Google sign-in was cancelled or failed');
+          return;
+        }
+        if (resp && resp.access_token && window.gapi && gapi.client) {
+          gapi.client.setToken({ access_token: resp.access_token });
+        }
+        if (pendingSaveAfterAuth) {
+          pendingSaveAfterAuth = false;
+          performSave(false);
+        }
+      },
     });
     gisInited = true;
-    checkAndAutoLoad();
   } catch (err) {
     console.error('GIS error:', err);
   }
 }
-function checkAndAutoLoad() {
-  if (gapiInited && gisInited && !authInProgress) {
-    loadSheetData(true);
-    loadContacts(true);
+function hasUsableToken() {
+  try {
+    const t = gapi.client.getToken();
+    return !!(t && t.access_token);
+  } catch (e) {
+    return false;
   }
+}
+function requestGoogleAccess(forceConsent) {
+  if (!tokenClient) {
+    gisLoaded();
+    showToast('Google sign-in not ready — tap Save again');
+    return false;
+  }
+  authInProgress = true;
+  tokenClient.requestAccessToken({ prompt: forceConsent ? 'consent' : '' });
+  return true;
+}
+async function loadSheetDataViaFetch(silent = false) {
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent('Sheet1!A1:Z1000')}?key=${API_KEY}&_=${Date.now()}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    applySheetRows(data.values || [], silent);
+  } catch (err) {
+    console.error('Fetch load error:', err);
+    if (!silent) alert('Load failed. Make sure the sheet is shared so this app can read it.');
+  }
+}
+function applySheetRows(rows, silent) {
+  if (!rows || rows.length === 0) {
+    if (!silent) alert('No data found.');
+    return;
+  }
+  const headers = rows[0].map(h => h ? h.trim() : '');
+  const seenNumbers = new Set();
+  jobs.length = 0;
+  for (let i = 1; i < rows.length; i++) {
+    const r = {};
+    headers.forEach((h, idx) => {
+      r[h] = rows[i][idx] !== undefined ? String(rows[i][idx]).trim() : '';
+    });
+    const jobNumber = r['Job Number'] || '';
+    if (jobNumber && seenNumbers.has(jobNumber)) continue;
+    seenNumbers.add(jobNumber);
+    let rawStart = r['Start Date'] || '';
+    let rawSched = r['Scheduled Date'] || rawStart;
+    let partsStart = rawStart.split('/');
+    if (partsStart.length === 3) {
+      partsStart[0] = parseInt(partsStart[0], 10).toString();
+      partsStart[1] = parseInt(partsStart[1], 10).toString();
+      rawStart = partsStart.join('/');
+    }
+    let partsSched = rawSched.split('/');
+    if (partsSched.length === 3) {
+      partsSched[0] = parseInt(partsSched[0], 10).toString();
+      partsSched[1] = parseInt(partsSched[1], 10).toString();
+      rawSched = partsSched.join('/');
+    }
+    jobs.push({
+      name: r['Name'] || '',
+      number: jobNumber,
+      startDate: rawStart,
+      scheduledDate: rawSched,
+      status: r['Field Ops'] || 'TAB',
+      fieldOps: r['Field Ops'] || 'TAB',
+      location: r['Location'] || '',
+      customer: r['Customer'] || '',
+      hours: r['Field Hours'] || '',
+      clientProjectManager: r['Client Project Manager'] || '',
+      pmNumber: r['PM Number'] || '',
+      pmEmail: r['PM Email'] || '',
+      preConEmail: r['Pre Con Email'] || '',
+      tbeEmail: r['TBE Email'] || '',
+      notes: r['Notes'] || '',
+      reportSent: r['Report Sent'] === 'TRUE',
+      reportSentAt: r['Report Sent At'] || '',
+      reportReadySentAt: r['Report Ready Sent At'] || '',
+      startEmailSentAt: r['Start Email Sent At'] || '',
+      observationsSentAt: r['Observations Sent At'] || '',
+      statusWarning: false,
+      newJobFlag: false
+    });
+  }
+  renderAll();
+  if (!silent) alert(`Loaded ${jobs.length} jobs!`);
 }
 async function loadSheetData(silent = false) {
   if (!gapiInited) {
-    if (!silent) alert('Google API not ready.');
+    loadSheetDataViaFetch(silent);
     return;
   }
   try {
@@ -363,66 +477,10 @@ async function loadSheetData(silent = false) {
       spreadsheetId: SHEET_ID,
       range: 'Sheet1!A1:Z1000',
     });
-    const rows = response.result.values || [];
-    if (rows.length === 0) {
-      if (!silent) alert('No data found.');
-      return;
-    }
-    const headers = rows[0].map(h => h ? h.trim() : '');
-    const seenNumbers = new Set();
-    jobs.length = 0;
-    for (let i = 1; i < rows.length; i++) {
-      const r = {};
-      headers.forEach((h, idx) => {
-        r[h] = rows[i][idx] !== undefined ? String(rows[i][idx]).trim() : '';
-      });
-      const jobNumber = r['Job Number'] || '';
-      if (jobNumber && seenNumbers.has(jobNumber)) continue;
-      seenNumbers.add(jobNumber);
-      let rawStart = r['Start Date'] || '';
-      let rawSched = r['Scheduled Date'] || rawStart;
-      let partsStart = rawStart.split('/');
-      if (partsStart.length === 3) {
-        partsStart[0] = parseInt(partsStart[0], 10).toString();
-        partsStart[1] = parseInt(partsStart[1], 10).toString();
-        rawStart = partsStart.join('/');
-      }
-      let partsSched = rawSched.split('/');
-      if (partsSched.length === 3) {
-        partsSched[0] = parseInt(partsSched[0], 10).toString();
-        partsSched[1] = parseInt(partsSched[1], 10).toString();
-        rawSched = partsSched.join('/');
-      }
-      jobs.push({
-        name: r['Name'] || '',
-        number: jobNumber,
-        startDate: rawStart,
-        scheduledDate: rawSched,
-        status: r['Field Ops'] || 'TAB',
-        fieldOps: r['Field Ops'] || 'TAB',
-        location: r['Location'] || '',
-        customer: r['Customer'] || '',
-        hours: r['Field Hours'] || '',
-        clientProjectManager: r['Client Project Manager'] || '',
-        pmNumber: r['PM Number'] || '',
-        pmEmail: r['PM Email'] || '',
-        preConEmail: r['Pre Con Email'] || '',
-        tbeEmail: r['TBE Email'] || '',
-        notes: r['Notes'] || '',
-        reportSent: r['Report Sent'] === 'TRUE',
-        reportSentAt: r['Report Sent At'] || '',
-        reportReadySentAt: r['Report Ready Sent At'] || '',
-        startEmailSentAt: r['Start Email Sent At'] || '',
-        observationsSentAt: r['Observations Sent At'] || '',
-        statusWarning: false,
-        newJobFlag: false
-      });
-    }
-    renderAll();
-    if (!silent) alert(`Loaded ${jobs.length} jobs!`);
+    applySheetRows(response.result.values || [], silent);
   } catch (err) {
     console.error('Load error:', err);
-    if (!silent) alert('Load failed.');
+    loadSheetDataViaFetch(silent);
   }
 }
 async function loadContacts(silent = false) {
@@ -451,22 +509,26 @@ async function loadContacts(silent = false) {
   }
 }
 async function saveToSheet(silent = false) {
-  if (authInProgress) return;
-  authInProgress = true;
-  if (!gapi.client.getToken()) {
-    tokenClient.callback = async (resp) => {
-      authInProgress = false;
-      if (resp.error) {
-        if (!silent) alert('Sign-in failed.');
-        return;
+  if (!gapiInited || !tokenClient) {
+    showToast('Connecting to Google…');
+    const ready = await waitForGoogleReady(8000);
+    if (!ready) {
+      if (!silent) {
+        alert('Google API did not load. Open this app from http://localhost or https:// (not a downloaded file), allow apis.google.com, then tap Save again.');
       }
-      await performSave(silent);
-    };
-    tokenClient.requestAccessToken({prompt: 'consent'});
-  } else {
-    await performSave(silent);
-    authInProgress = false;
+      return;
+    }
   }
+  if (!hasUsableToken()) {
+    if (silent) {
+      showToast('Tap “Save to Google Sheet” to allow writing');
+      return;
+    }
+    pendingSaveAfterAuth = true;
+    requestGoogleAccess(true);
+    return;
+  }
+  await performSave(silent);
 }
 async function performSave(silent = false) {
   try {
@@ -502,9 +564,22 @@ async function performSave(silent = false) {
       resource: { values }
     });
     if (!silent) alert('Saved!');
+    else showToast('Saved to Google Sheet');
   } catch (err) {
     console.error('Save error:', err);
-    if (!silent) alert('Save failed.');
+    const status = err && err.status;
+    const msg = (err && err.result && err.result.error && err.result.error.message) || (err && err.message) || '';
+    if (status === 401 || status === 403 || /auth|permission|login/i.test(msg)) {
+      try { gapi.client.setToken(null); } catch (e) {}
+      if (silent) {
+        showToast('Tap “Save to Google Sheet” to allow writing');
+        return;
+      }
+      pendingSaveAfterAuth = true;
+      requestGoogleAccess(true);
+      return;
+    }
+    if (!silent) alert('Save failed: ' + (msg || 'unknown error'));
   }
 }
 let autoSaveTimeout;
@@ -515,15 +590,37 @@ function triggerAutoSave() {
 document.getElementById('loadSheet').onclick = () => loadSheetData(false);
 document.getElementById('saveSheet').onclick = () => saveToSheet(false);
 gapiLoad();
-gisLoaded();
+if (window.google && google.accounts && google.accounts.oauth2) gisLoaded();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    loadSheetData(true);
+    loadContacts(true);
+  }
+});
+window.addEventListener('pageshow', () => {
+  if (gapiInited) {
+    loadSheetData(true);
+    loadContacts(true);
+  }
+});
 // === BASELINE CODE ===
 const jobs = [];
+let hideCompleted = localStorage.getItem('hideCompleted') === 'true';
 let activeJob = null;
 let currentMonth = new Date().getMonth();
 let currentYear = new Date().getFullYear();
 const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const sortDirection = {};
 let previousJobList = [];
+function isCompletedJob(j) {
+  const v = ((j && (j.fieldOps || j.status)) || '').trim().toLowerCase();
+  return v === 'complete';
+}
+function visibleJobs(list) {
+  const src = list || jobs;
+  if (!hideCompleted) return src;
+  return src.filter(j => !isCompletedJob(j));
+}
 function statusClass(v) {
   v = (v || 'TAB').toLowerCase();
   if (v === 'complete') return 'status-blue';
@@ -575,7 +672,7 @@ function renderCalendar() {
       day.classList.add('today');
     }
     day.innerHTML = `<div class="calendar-date">${i}</div>`;
-    const dayJobs = jobs.filter(j => j.scheduledDate === dateStr);
+    const dayJobs = visibleJobs().filter(j => j.scheduledDate === dateStr);
     dayJobs.slice(0,4).forEach(j => {
       const el = document.createElement('div');
       el.className = 'calendar-job ' + statusClass(j.status || j.fieldOps);
@@ -656,7 +753,7 @@ document.addEventListener('click', e => {
 function renderList(filteredJobs) {
   const tbody = document.querySelector('#jobTable tbody');
   tbody.innerHTML = '';
-  const listToRender = filteredJobs || jobs;
+  const listToRender = visibleJobs(filteredJobs || jobs);
 
   // NEW: Show new jobs (red circle 🔴) at the very top
   const newJobs = listToRender.filter(j => j.newJobFlag === true);
@@ -1194,6 +1291,15 @@ document.getElementById('editBtn').onclick = openEditPane;
 document.getElementById('editBackBtn').onclick = () => editPane.classList.remove('open');
 document.getElementById('saveEditBtn').onclick = saveEditPane;
 document.querySelectorAll('#jobTable th').forEach(th => th.onclick = () => { sortJobs(th.dataset.field); renderList(); });
+const hideToggle = document.getElementById('hideCompletedToggle');
+if (hideToggle) {
+  hideToggle.checked = hideCompleted;
+  hideToggle.addEventListener('change', () => {
+    hideCompleted = hideToggle.checked;
+    localStorage.setItem('hideCompleted', hideCompleted ? 'true' : 'false');
+    renderAll();
+  });
+}
 document.getElementById('jobSearch').addEventListener('input', () => {
   const query = document.getElementById('jobSearch').value.toLowerCase();
   if (!query) { renderList(); return; }
@@ -1349,6 +1455,5 @@ renderAll();
 </script>
 </body>
 </html>
-
 
 
