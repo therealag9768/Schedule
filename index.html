@@ -591,11 +591,6 @@ function triggerAutoSave() {
   clearTimeout(autoSaveTimeout);
   autoSaveTimeout = setTimeout(() => saveToSheet(true), 4000);
 }
-function maybeReloadFromSheet() {
-  if (hasUnsavedChanges || authInProgress || pendingSaveAfterAuth) return;
-  loadSheetData(true);
-  loadContacts(true);
-}
 document.getElementById('loadSheet').onclick = () => {
   hasUnsavedChanges = false;
   loadSheetData(false);
@@ -603,12 +598,6 @@ document.getElementById('loadSheet').onclick = () => {
 document.getElementById('saveSheet').onclick = () => saveToSheet(false);
 gapiLoad();
 if (window.google && google.accounts && google.accounts.oauth2) gisLoaded();
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') maybeReloadFromSheet();
-});
-window.addEventListener('pageshow', (e) => {
-  if (e.persisted) maybeReloadFromSheet();
-});
 // === BASELINE CODE ===
 const jobs = [];
 let hideCompleted = localStorage.getItem('hideCompleted') === 'true';
@@ -1256,7 +1245,7 @@ SEND TO ME:
 🔴(Project completion date for TAB)
 🔴(Pre TAB Checklist) Link➔ https://shorturl.at/LkY45
 
-SEND TO OUR PRECONSTRUCTION TEAM (IF NOT SENT ALREADY): dfunchess@palmettoairbalance.com
+SEND TO OUR PRECONSTRUCTION TEAM (➡️𝗜𝗙 𝗡𝗢𝗧 𝗦𝗘𝗡𝗧 𝗔𝗟𝗥𝗘𝗔𝗗𝗬)
 🔴(TAB Specs and Tolerances)
 🔴(Equipment submittals)
 🔴(Final approved construction mechanical drawings to be used)
