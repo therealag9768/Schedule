@@ -1288,7 +1288,7 @@ SEND TO ME:
 🔴(Project completion date for TAB)
 🔴(Pre TAB Checklist) Link➔ https://shorturl.at/LkY45
 
-SEND TO OUR PRECONSTRUCTION TEAM: (𝐈𝐅 𝐍𝐎𝐓 𝐀𝐋𝐑𝐄𝐀𝐃𝐘 𝐒𝐄𝐍𝐓)
+SEND TO OUR PRECONSTRUCTION TEAM (𝐈𝐅 𝐍𝐎𝐓 𝐀𝐋𝐑𝐄𝐀𝐃𝐘 𝐒𝐄𝐍𝐓):
 🔴(TAB Specs and Tolerances)
 🔴(Equipment submittals)
 🔴(Final approved construction mechanical drawings to be used)
@@ -1527,6 +1527,11 @@ function formatWeekLabel(weekKey) {
   return `${d.getMonth()+1}/${d.getDate()} – ${end.getMonth()+1}/${end.getDate()}/${end.getFullYear()}`;
 }
 
+function fullMonthName(short) {
+  const map = {Jan:'January',Feb:'February',Mar:'March',Apr:'April',May:'May',Jun:'June',Jul:'July',Aug:'August',Sep:'September',Oct:'October',Nov:'November',Dec:'December'};
+  return map[short] || short;
+}
+
 function formatMonthLabel(monthKey) {
   const [y, m] = monthKey.split('-');
   const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -1605,7 +1610,7 @@ function renderCapacity() {
     const m = months[mk];
     const div = document.createElement('div');
     div.className = 'capacity-month';
-    let html = `<div class="capacity-month-header"><span>${formatMonthLabel(mk)}</span><span>${m.jobs} jobs · ${m.hours.toFixed(0)} hrs · ${m.techs} techs · ~${Object.values(m.weeks).reduce((s,w)=>s+w.days,0)} tech-days</span></div>`;
+    let html = `<div class="capacity-month-header"><span>${formatMonthLabel(mk)}</span><span>${m.jobs} jobs · ${m.hours.toFixed(0)} hours · ${m.techs} techs · ~${Object.values(m.weeks).reduce((s,w)=>s+w.days,0)} tech-days</span></div>`;
     const weekKeys = Object.keys(m.weeks).sort();
     weekKeys.forEach(wk => {
       const w = m.weeks[wk];
@@ -1615,17 +1620,17 @@ function renderCapacity() {
       const maxRef = Math.max(w.techs, Number(avail) || 0, 1);
       const barPct = Math.min(100, (w.techs / maxRef) * 100);
       const gapText = gap === null ? '' : (gap >= 0 ? `+${gap} covered` : `${gap} short`);
-      const jobsHtml = w.list.map(j => `<div>• ${j.name || 'Unnamed'} (${j.hours || 0} hrs)</div>`).join('');
+      const jobsHtml = w.list.map(j => `<div>• ${j.name || 'Unnamed'} (${j.number || 'no #'}) — ${j.hours || 0} hours</div>`).join('');
       html += `<div class="capacity-week" data-week="${wk}">
         <div class="capacity-week-label">
           <span>${formatWeekLabel(wk)}</span>
-          <span>Techs available: <input type="number" class="techs-input" data-week="${wk}" value="${avail}" min="0"></span>
+          <span>Techs available: <input type="number" class="techs-input" data-week="${wk}" value="${avail}" min="0"> <button class="copy-week" data-week="${wk}" style="padding:4px 8px;font-size:14px;background:#555;color:#fff;border:none;border-radius:4px;cursor:pointer">Copy</button></span>
         </div>
         <div class="capacity-bar-wrap">
           <div class="capacity-bar-bg"><div class="capacity-bar-fill ${barClass}" style="width:${barPct}%"></div></div>
           <span>${w.techs} needed ${gapText}</span>
         </div>
-        <div class="capacity-meta">${w.jobs} jobs · ${w.hours.toFixed(0)} hrs · ~${w.days} tech-days (hours ÷ 10)</div>
+        <div class="capacity-meta">${w.jobs} jobs · ${w.hours.toFixed(0)} hours · ~${w.days} tech-days (hours ÷ 10)</div>
         <div class="week-jobs">${jobsHtml || '<div>No jobs</div>'}</div>
       </div>`;
     });
@@ -1646,13 +1651,108 @@ function renderCapacity() {
 
   bars.querySelectorAll('.capacity-week').forEach(el => {
     el.addEventListener('click', (e) => {
-      if (e.target.classList.contains('techs-input')) return;
+      if (e.target.classList.contains('techs-input') || e.target.classList.contains('copy-week')) return;
       el.querySelector('.week-jobs').classList.toggle('open');
+    });
+  });
+  bars.querySelectorAll('.copy-week').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const weekEl = btn.closest('.capacity-week');
+      const label = weekEl.querySelector('.capacity-week-label span').textContent;
+      const meta = weekEl.querySelector('.capacity-meta').textContent;
+      const techs = (weekEl.querySelector('.capacity-bar-wrap span').textContent.match(/^\d+/) || ['0'])[0];
+      const techWord = Number(techs) === 1 ? 'tech' : 'techs';
+      const jobs = Array.from(weekEl.querySelectorAll('.week-jobs div')).map(d => '    ' + cleanForEmail(d.textContent)).join('\n');
+      const plain = `See below for current coverage needs.\n\n\n${label}:\n${techs} ${techWord} needed | ${meta}\n${jobs}\n\n\nThank you,`;
+      const jobsHtml = Array.from(weekEl.querySelectorAll('.week-jobs div')).map(d => '&nbsp;&nbsp;&nbsp;&nbsp;• ' + cleanForEmail(d.textContent).replace(/^•\s*/, '')).join('<br>');
+      const html = `<b>See below for current coverage needs.</b><br><br><br><b>${label}:</b><br>${techs} ${techWord} needed | ${meta}<br>${jobsHtml}<br><br><br>Thank you,`;
+      const monthName = (document.querySelector('.capacity-month-header span') || {}).textContent || '';
+      const monthWord = fullMonthName(monthName.split(' ')[0] || 'Month');
+      const weekStart = label.split('–')[0].trim();
+      const subject = `${monthWord} (Week of ${weekStart}) Weekly Job Capacity Summary - Aaron Griffin`;
+      copyRichAndEmail(plain, html, subject);
     });
   });
 
   document.getElementById('capacitySummary').textContent =
     `Overall: ${grandJobs} jobs · ${grandHours.toFixed(0)} hours · ${grandTechs} techs needed (1 per job)`;
+}
+
+function cleanForEmail(s) {
+  return (s || '').replace(/[\r\n]+/g, ' ').replace(/[ \t]+/g, ' ').trim();
+}
+
+function openEmailWithCapacity(plain, subjectText) {
+  const to = 'cmcdougald@palmettoairbalance.com';
+  const cc = 'tmabry@palmettoairbalance.com';
+  const subject = encodeURIComponent(subjectText || 'Job Capacity Summary - Aaron Griffin');
+  const body = encodeURIComponent(plain);
+  window.open(`mailto:${to}?cc=${encodeURIComponent(cc)}&subject=${subject}&body=${body}`, '_blank');
+}
+
+function capacityPlain() {
+  let text = 'See below for current coverage needs.\n\n\n';
+  document.querySelectorAll('.capacity-month').forEach(m => {
+    const monthShort = m.querySelector('.capacity-month-header span').textContent;
+    const month = fullMonthName(monthShort.split(' ')[0]) + ' ' + (monthShort.split(' ')[1] || '');
+    const overall = document.getElementById('capacitySummary').textContent;
+    const daysMatch = m.querySelector('.capacity-month-header').textContent.match(/~\d+ tech-days/);
+    const days = daysMatch ? ' ' + daysMatch[0] : '';
+    text += `${month} ${overall}${days}\n\n`;
+    m.querySelectorAll('.capacity-week').forEach(w => {
+      const label = w.querySelector('.capacity-week-label span').textContent;
+      const meta = w.querySelector('.capacity-meta').textContent;
+      const techs = (w.querySelector('.capacity-bar-wrap span').textContent.match(/^\d+/) || ['0'])[0];
+      const techWord = Number(techs) === 1 ? 'tech' : 'techs';
+      const jobs = Array.from(w.querySelectorAll('.week-jobs div')).map(d => '    ' + cleanForEmail(d.textContent)).join('\n');
+      text += `${label}:\n${techs} ${techWord} needed | ${meta}\n${jobs}\n\n`;
+    });
+  });
+  text += '\n\nThank you,';
+  return text.trim();
+}
+
+function capacityHtml() {
+  let html = '<b>See below for current coverage needs.</b><br><br><br>';
+  document.querySelectorAll('.capacity-month').forEach(m => {
+    const monthShort = m.querySelector('.capacity-month-header span').textContent;
+    const month = fullMonthName(monthShort.split(' ')[0]) + ' ' + (monthShort.split(' ')[1] || '');
+    const overall = document.getElementById('capacitySummary').textContent;
+    const daysMatch = m.querySelector('.capacity-month-header').textContent.match(/~\d+ tech-days/);
+    const days = daysMatch ? ' ' + daysMatch[0] : '';
+    html += `<b>${month}</b> <b>Overall:</b> ${overall.replace('Overall: ', '')}${days}<br><br>`;
+    m.querySelectorAll('.capacity-week').forEach(w => {
+      const label = w.querySelector('.capacity-week-label span').textContent;
+      const meta = w.querySelector('.capacity-meta').textContent;
+      const techs = (w.querySelector('.capacity-bar-wrap span').textContent.match(/^\d+/) || ['0'])[0];
+      const techWord = Number(techs) === 1 ? 'tech' : 'techs';
+      const jobs = Array.from(w.querySelectorAll('.week-jobs div')).map(d => '&nbsp;&nbsp;&nbsp;&nbsp;• ' + cleanForEmail(d.textContent).replace(/^•\s*/, '')).join('<br>');
+      html += `<b>${label}:</b><br>${techs} ${techWord} needed | ${meta}<br>${jobs}<br><br>`;
+    });
+  });
+  html += '<br><br>Thank you,';
+  return html;
+}
+
+function openEmailWithCapacity(plain, subjectText) {
+  const to = 'cmcdougald@palmettoairbalance.com';
+  const cc = 'tmabry@palmettoairbalance.com';
+  const subject = encodeURIComponent(subjectText || 'Job Capacity Summary - Aaron Griffin');
+  const body = encodeURIComponent(plain);
+  window.open(`mailto:${to}?cc=${encodeURIComponent(cc)}&subject=${subject}&body=${body}`, '_blank');
+}
+
+async function copyRichAndEmail(plain, html, subjectText) {
+  try {
+    const blob = new Blob([html], { type: 'text/html' });
+    const plainBlob = new Blob([plain], { type: 'text/plain' });
+    await navigator.clipboard.write([new ClipboardItem({ 'text/html': blob, 'text/plain': plainBlob })]);
+    showToast('Copied — paste into email for bold');
+  } catch (e) {
+    try { await navigator.clipboard.writeText(plain); } catch (_) {}
+  }
+  openEmailWithCapacity(plain, subjectText);
 }
 
 document.getElementById('capacityDateField').onchange = () => { populateCapacityMonths(); renderCapacity(); };
@@ -1662,18 +1762,10 @@ document.getElementById('showCapacityToggle').onchange = (e) => {
   if (e.target.checked) renderCapacity();
 };
 document.getElementById('copyCapacity').onclick = () => {
-  const text = document.getElementById('capacitySummary').textContent + '\n\n' +
-    Array.from(document.querySelectorAll('.capacity-month')).map(m => {
-      const header = m.querySelector('.capacity-month-header').textContent;
-      const weeks = Array.from(m.querySelectorAll('.capacity-week')).map(w => {
-        const label = w.querySelector('.capacity-week-label span').textContent;
-        const meta = w.querySelector('.capacity-meta').textContent;
-        const needed = w.querySelector('.capacity-bar-wrap span').textContent;
-        return `  ${label}: ${needed} | ${meta}`;
-      }).join('\n');
-      return header + '\n' + weeks;
-    }).join('\n\n');
-  navigator.clipboard.writeText(text).then(() => showToast('Capacity summary copied')).catch(() => alert('Copy failed'));
+  const monthName = (document.querySelector('.capacity-month-header span') || {}).textContent || '';
+  const monthWord = fullMonthName(monthName.split(' ')[0] || 'Month');
+  const subject = `${monthWord} Monthly Job Capacity Summary - Aaron Griffin`;
+  copyRichAndEmail(capacityPlain(), capacityHtml(), subject);
 };
 
 renderAll();
