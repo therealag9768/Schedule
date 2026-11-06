@@ -202,7 +202,8 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
         <option value="Complete">Complete</option>
       </select>
     </label>
-    <span id="totalHoursLabel" style="font-size:18px;font-weight:600;color:#1e88e5">Total hours: 0</span>
+    <span id="totalJobsLabel" style="font-size:18px;font-weight:600;color:#1e88e5">Total Jobs: 0</span>
+    <span id="totalHoursLabel" style="font-size:18px;font-weight:600;color:#1e88e5">Total Hours: 0</span>
   </div>
   <div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;justify-content:center">
     <button id="uploadCSV">Upload CSV / XLS</button>
@@ -1372,8 +1373,10 @@ function applyJobFilters() {
   if (status) list = list.filter(j => (j.fieldOps || j.status || '') === status);
   if (query) list = list.filter(j => (j.name||'').toLowerCase().includes(query) || (j.number||'').toLowerCase().includes(query) || (j.customer||'').toLowerCase().includes(query));
   const hours = list.reduce((s, j) => s + (parseFloat(j.hours) || 0), 0);
-  const label = document.getElementById('totalHoursLabel');
-  if (label) label.textContent = `Total hours: ${hours.toFixed(0)}`;
+  const jobsLabel = document.getElementById('totalJobsLabel');
+  const hoursLabel = document.getElementById('totalHoursLabel');
+  if (jobsLabel) jobsLabel.textContent = `Total Jobs: ${list.length}`;
+  if (hoursLabel) hoursLabel.textContent = `Total Hours: ${hours.toFixed(0)}`;
   renderList(list);
 }
 function sortJobs(field) {
