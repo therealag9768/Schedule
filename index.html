@@ -186,10 +186,24 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
     <div id="capacityBars"></div>
   </div>
   <input type="text" id="jobSearch" placeholder="Search jobs by name, number, or customer...">
-  <label id="hideCompletedLabel" style="display:flex;align-items:center;gap:10px;margin:0 0 12px;font-size:18px;font-weight:600;cursor:pointer;user-select:none">
-    <input type="checkbox" id="hideCompletedToggle">
-    Hide completed jobs
-  </label>
+  <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:0 0 12px;width:100%;max-width:1075px;justify-content:center">
+    <label id="hideCompletedLabel" style="display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600;cursor:pointer;user-select:none;margin:0">
+      <input type="checkbox" id="hideCompletedToggle">
+      Hide completed jobs
+    </label>
+    <label style="display:flex;align-items:center;gap:8px;font-size:18px;font-weight:600">
+      Status
+      <select id="statusFilter" style="padding:6px 10px;font-size:16px;border-radius:8px;border:1px solid #ccc">
+        <option value="">All</option>
+        <option value="Field Ready">Field Ready</option>
+        <option value="TAB">TAB</option>
+        <option value="Standby">Standby</option>
+        <option value="Stalled">Stalled</option>
+        <option value="Complete">Complete</option>
+      </select>
+    </label>
+    <span id="totalHoursLabel" style="font-size:18px;font-weight:600;color:#1e88e5">Total hours: 0</span>
+  </div>
   <div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;justify-content:center">
     <button id="uploadCSV">Upload CSV / XLS</button>
     <button id="downloadAirOne">Download Air One XLS</button>
@@ -1348,12 +1362,20 @@ if (hideToggle) {
     renderAll();
   });
 }
-document.getElementById('jobSearch').addEventListener('input', () => {
-  const query = document.getElementById('jobSearch').value.toLowerCase();
-  if (!query) { renderList(); return; }
-  const filtered = jobs.filter(j => (j.name||'').toLowerCase().includes(query) || (j.number||'').toLowerCase().includes(query) || (j.customer||'').toLowerCase().includes(query));
-  renderList(filtered.slice(0,10));
-});
+document.getElementById('jobSearch').addEventListener('input', applyJobFilters);
+document.getElementById('statusFilter').addEventListener('change', applyJobFilters);
+
+function applyJobFilters() {
+  const query = (document.getElementById('jobSearch').value || '').toLowerCase();
+  const status = document.getElementById('statusFilter').value;
+  let list = visibleJobs();
+  if (status) list = list.filter(j => (j.fieldOps || j.status || '') === status);
+  if (query) list = list.filter(j => (j.name||'').toLowerCase().includes(query) || (j.number||'').toLowerCase().includes(query) || (j.customer||'').toLowerCase().includes(query));
+  const hours = list.reduce((s, j) => s + (parseFloat(j.hours) || 0), 0);
+  const label = document.getElementById('totalHoursLabel');
+  if (label) label.textContent = `Total hours: ${hours.toFixed(0)}`;
+  renderList(list);
+}
 function sortJobs(field) {
   const dir = sortDirection[field] === 'asc' ? 'desc' : 'asc';
   sortDirection[field] = dir;
@@ -1372,6 +1394,7 @@ function renderAll() {
   makeJobsDraggable();
   if (window.hot) updateSpreadsheetData();
   if (typeof renderCapacity === 'function') renderCapacity();
+  if (typeof applyJobFilters === 'function') applyJobFilters();
 }
 let hot = null;
 function getAllKeys() {
