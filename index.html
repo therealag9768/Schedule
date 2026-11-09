@@ -207,6 +207,7 @@ html,body{width:100%;height:100%;margin:0;padding:0;overflow-x:hidden}
   </div>
   <div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;justify-content:center">
     <button id="uploadCSV">Upload CSV / XLS</button>
+    <button id="matchAllAirOne">Match All Air One</button>
     <button id="downloadAirOne">Download Air One XLS</button>
     <button id="loadSheet">Load from Google Sheet</button>
     <button id="saveSheet">Save to Google Sheet</button>
@@ -518,7 +519,11 @@ function applySheetRows(rows, silent) {
       startEmailSentAt: r['Start Email Sent At'] || '',
       observationsSentAt: r['Observations Sent At'] || '',
       statusWarning: false,
-      newJobFlag: false
+      newJobFlag: r['New Job Flag'] === 'TRUE',
+      startDateMismatch: r['Start Date Mismatch'] === 'TRUE',
+      airOneStartDate: r['Air One Start Date'] || '',
+      statusWarning: r['Status Warning'] === 'TRUE',
+      airOneStatus: r['Air One Status'] || ''
     });
   }
   renderAll();
@@ -589,7 +594,7 @@ async function saveToSheet(silent = false) {
 }
 async function performSave(silent = false) {
   try {
-    const headers = ['Name','Job Number','Field Ops','Field Hours','Start Date','Scheduled Date','Customer','Client Project Manager','PM Number','PM Email','Location','Pre Con Email','TBE Email','Notes','Report Sent','Report Sent At','Report Ready Sent At','Start Email Sent At','Observations Sent At'];
+    const headers = ['Name','Job Number','Field Ops','Field Hours','Start Date','Scheduled Date','Customer','Client Project Manager','PM Number','PM Email','Location','Pre Con Email','TBE Email','Notes','Report Sent','Report Sent At','Report Ready Sent At','Start Email Sent At','Observations Sent At','New Job Flag','Start Date Mismatch','Air One Start Date','Status Warning','Air One Status'];
     const values = [headers];
     jobs.forEach(j => {
       values.push([
@@ -611,7 +616,12 @@ async function performSave(silent = false) {
         j.reportSentAt || '',
         j.reportReadySentAt || '',
         j.startEmailSentAt || '',
-        j.observationsSentAt || ''
+        j.observationsSentAt || '',
+        j.newJobFlag ? 'TRUE' : 'FALSE',
+        j.startDateMismatch ? 'TRUE' : 'FALSE',
+        j.airOneStartDate || '',
+        j.statusWarning ? 'TRUE' : 'FALSE',
+        j.airOneStatus || ''
       ]);
     });
     await gapi.client.sheets.spreadsheets.values.update({
@@ -838,13 +848,13 @@ function renderList(filteredJobs) {
 
   // Then normal rows
   normal.forEach(j => {
-    const warningIcon = j.statusWarning ? '⚠️ ' : '';
+    const icons = `${j.startDateMismatch ? '📅 ' : ''}${j.statusWarning ? '⚠️ ' : ''}`;
     const checkContent = j.reportSent ? `
       <br><span class="checkmark">✅</span><span class="sent-info"> ${j.reportSentAt || ''}</span>
     ` : '';
     const tr = document.createElement('tr');
     tr.className = statusClass(j.status || j.fieldOps) + (j.reportSent ? ' checked-row' : '');
-    tr.innerHTML = `<td>${warningIcon}${j.name||''}${checkContent}</td><td>${j.number||''}</td><td>${j.fieldOps||''}</td><td>${j.startDate||''}</td><td>${j.hours||''}</td><td>${j.customer||''}</td>`;
+    tr.innerHTML = `<td>${icons}${j.name||''}${checkContent}</td><td>${j.number||''}</td><td>${j.fieldOps||''}</td><td>${j.startDate||''}</td><td>${j.hours||''}</td><td>${j.customer||''}</td>`;
     tr.onclick = () => openJob(j);
     tbody.appendChild(tr);
   });
@@ -856,11 +866,34 @@ function openJob(j) {
   info.innerHTML = `<div class="row"><span>Location</span><span>${j.location||''}</span></div>
                    <div class="row"><span>Field Hours</span><span>${j.hours||''}</span></div>
                    <div class="row"><span>Official Start Date</span><span>${j.startDate||''}</span></div>
+                   ${j.startDateMismatch ? `<div class="row" style="background:#fff3cd;padding:8px;border-radius:8px;margin:8px 0"><span>📅 Air One Start Date</span><span>${j.airOneStartDate||''}</span></div><button id="useAirOneDate" style="padding:8px 12px;background:#1e88e5;color:#fff;border:none;border-radius:8px;cursor:pointer;margin-bottom:8px">Use Air One Start Date</button>` : ''}
+                   ${j.statusWarning ? `<div class="row" style="background:#fff3cd;padding:8px;border-radius:8px;margin:8px 0"><span>⚠️ Air One Status</span><span>${j.airOneStatus||''}</span></div><button id="useAirOneStatus" style="padding:8px 12px;background:#1e88e5;color:#fff;border:none;border-radius:8px;cursor:pointer;margin-bottom:8px">Use Air One Status</button>` : ''}
                    <div class="row"><span>Scheduled Date</span><span>${j.scheduledDate||j.startDate||''}</span></div>
                    <div class="row"><span>Customer</span><span>${j.customer||''}</span></div>
                    <div class="row"><span>Client Project Manager</span><span>${j.clientProjectManager||'N/A'}</span></div>
                    <div class="row"><span>PM Number</span><span>${j.pmNumber||'N/A'}</span></div>
                    <div class="row"><span>PM Email</span><span>${j.pmEmail||'N/A'}</span></div>`;
+  if (j.startDateMismatch) {
+    document.getElementById('useAirOneDate').onclick = () => {
+      activeJob.startDate = activeJob.airOneStartDate;
+      activeJob.startDateMismatch = false;
+      activeJob.airOneStartDate = '';
+      triggerAutoSave();
+      openJob(activeJob);
+      showToast('Start date updated from Air One');
+    };
+  }
+  if (j.statusWarning) {
+    document.getElementById('useAirOneStatus').onclick = () => {
+      activeJob.fieldOps = activeJob.airOneStatus;
+      activeJob.status = activeJob.airOneStatus;
+      activeJob.statusWarning = false;
+      activeJob.airOneStatus = '';
+      triggerAutoSave();
+      openJob(activeJob);
+      showToast('Status updated from Air One');
+    };
+  }
   const notes = document.getElementById('notes');
   notes.value = j.notes || '';
   autoGrowNotes();
@@ -1080,8 +1113,28 @@ function triggerFileInput() {
           const jobNumber = r['Job Number'] || '';
           if (jobNumber && existingNumbers.has(jobNumber)) {
             const existing = jobs.find(j => j.number === jobNumber);
-            if (existing && (existing.status || '') !== r['Field Ops']) {
-              existing.statusWarning = true;
+            if (existing) {
+              if ((existing.fieldOps || existing.status || '') !== (r['Field Ops'] || '')) {
+                existing.statusWarning = true;
+                existing.airOneStatus = r['Field Ops'] || '';
+              } else {
+                existing.statusWarning = false;
+                existing.airOneStatus = '';
+              }
+              let rawStart = r['Start Date'] || '';
+              let partsStart = rawStart.split('/');
+              if (partsStart.length === 3) {
+                partsStart[0] = parseInt(partsStart[0], 10).toString();
+                partsStart[1] = parseInt(partsStart[1], 10).toString();
+                rawStart = partsStart.join('/');
+              }
+              if (rawStart && rawStart !== (existing.startDate || '')) {
+                existing.startDateMismatch = true;
+                existing.airOneStartDate = rawStart;
+              } else {
+                existing.startDateMismatch = false;
+                existing.airOneStartDate = '';
+              }
             }
             return;
           }
@@ -1137,6 +1190,30 @@ function triggerFileInput() {
   input.click();
 }
 document.getElementById('uploadCSV').onclick = triggerFileInput;
+document.getElementById('matchAllAirOne').onclick = () => {
+  const flagged = jobs.filter(j => j.startDateMismatch || j.statusWarning);
+  if (!flagged.length) {
+    showToast('No Air One mismatches');
+    return;
+  }
+  if (!confirm(`Update ${flagged.length} job(s) to match Air One?`)) return;
+  flagged.forEach(j => {
+    if (j.startDateMismatch && j.airOneStartDate) {
+      j.startDate = j.airOneStartDate;
+      j.startDateMismatch = false;
+      j.airOneStartDate = '';
+    }
+    if (j.statusWarning && j.airOneStatus) {
+      j.fieldOps = j.airOneStatus;
+      j.status = j.airOneStatus;
+      j.statusWarning = false;
+      j.airOneStatus = '';
+    }
+  });
+  renderAll();
+  triggerAutoSave();
+  showToast(`Matched ${flagged.length} job(s)`);
+};
 document.getElementById('downloadAirOne').onclick = () => {
   window.open('https://airone.palmettoairbalance.com/project_management/projects/?_export=xls','_blank');
   document.getElementById('downloadModal').style.display = 'flex';
@@ -1330,6 +1407,7 @@ Thank you,
       hour12: true
     });
     activeJob.startEmailSentAt = stamp;
+    activeJob.newJobFlag = false;
     triggerAutoSave();
     openJob(activeJob);
   } else {
