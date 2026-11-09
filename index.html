@@ -523,7 +523,8 @@ function applySheetRows(rows, silent) {
       startDateMismatch: r['Start Date Mismatch'] === 'TRUE',
       airOneStartDate: r['Air One Start Date'] || '',
       statusWarning: r['Status Warning'] === 'TRUE',
-      airOneStatus: r['Air One Status'] || ''
+      airOneStatus: r['Air One Status'] || '',
+      missingFromAirOne: r['Missing From Air One'] === 'TRUE'
     });
   }
   renderAll();
@@ -594,7 +595,7 @@ async function saveToSheet(silent = false) {
 }
 async function performSave(silent = false) {
   try {
-    const headers = ['Name','Job Number','Field Ops','Field Hours','Start Date','Scheduled Date','Customer','Client Project Manager','PM Number','PM Email','Location','Pre Con Email','TBE Email','Notes','Report Sent','Report Sent At','Report Ready Sent At','Start Email Sent At','Observations Sent At','New Job Flag','Start Date Mismatch','Air One Start Date','Status Warning','Air One Status'];
+    const headers = ['Name','Job Number','Field Ops','Field Hours','Start Date','Scheduled Date','Customer','Client Project Manager','PM Number','PM Email','Location','Pre Con Email','TBE Email','Notes','Report Sent','Report Sent At','Report Ready Sent At','Start Email Sent At','Observations Sent At','New Job Flag','Start Date Mismatch','Air One Start Date','Status Warning','Air One Status','Missing From Air One'];
     const values = [headers];
     jobs.forEach(j => {
       values.push([
@@ -621,7 +622,8 @@ async function performSave(silent = false) {
         j.startDateMismatch ? 'TRUE' : 'FALSE',
         j.airOneStartDate || '',
         j.statusWarning ? 'TRUE' : 'FALSE',
-        j.airOneStatus || ''
+        j.airOneStatus || '',
+        j.missingFromAirOne ? 'TRUE' : 'FALSE'
       ]);
     });
     await gapi.client.sheets.spreadsheets.values.update({
@@ -848,7 +850,7 @@ function renderList(filteredJobs) {
 
   // Then normal rows
   normal.forEach(j => {
-    const icons = `${j.startDateMismatch ? '📅 ' : ''}${j.statusWarning ? '⚠️ ' : ''}`;
+    const icons = `${j.missingFromAirOne ? '🚫 ' : ''}${j.startDateMismatch ? '📅 ' : ''}${j.statusWarning ? '⚠️ ' : ''}`;
     const checkContent = j.reportSent ? `
       <br><span class="checkmark">✅</span><span class="sent-info"> ${j.reportSentAt || ''}</span>
     ` : '';
@@ -868,6 +870,7 @@ function openJob(j) {
                    <div class="row"><span>Official Start Date</span><span>${j.startDate||''}</span></div>
                    ${j.startDateMismatch ? `<div class="row" style="background:#fff3cd;padding:8px;border-radius:8px;margin:8px 0"><span>📅 Air One Start Date</span><span>${j.airOneStartDate||''}</span></div><button id="useAirOneDate" style="padding:8px 12px;background:#1e88e5;color:#fff;border:none;border-radius:8px;cursor:pointer;margin-bottom:8px">Use Air One Start Date</button>` : ''}
                    ${j.statusWarning ? `<div class="row" style="background:#fff3cd;padding:8px;border-radius:8px;margin:8px 0"><span>⚠️ Air One Status</span><span>${j.airOneStatus||''}</span></div><button id="useAirOneStatus" style="padding:8px 12px;background:#1e88e5;color:#fff;border:none;border-radius:8px;cursor:pointer;margin-bottom:8px">Use Air One Status</button>` : ''}
+                   ${j.missingFromAirOne ? `<div class="row" style="background:#ffebee;padding:8px;border-radius:8px;margin:8px 0"><span>🚫 Not in Air One list</span><span>Closed?</span></div><button id="markCompleteFromAirOne" style="padding:8px 12px;background:#4caf50;color:#fff;border:none;border-radius:8px;cursor:pointer;margin:0 8px 8px 0">Mark Complete</button><button id="deleteMissingJob" style="padding:8px 12px;background:#d32f2f;color:#fff;border:none;border-radius:8px;cursor:pointer;margin-bottom:8px">Delete</button>` : ''}
                    <div class="row"><span>Scheduled Date</span><span>${j.scheduledDate||j.startDate||''}</span></div>
                    <div class="row"><span>Customer</span><span>${j.customer||''}</span></div>
                    <div class="row"><span>Client Project Manager</span><span>${j.clientProjectManager||'N/A'}</span></div>
@@ -892,6 +895,26 @@ function openJob(j) {
       triggerAutoSave();
       openJob(activeJob);
       showToast('Status updated from Air One');
+    };
+  }
+  if (j.missingFromAirOne) {
+    document.getElementById('markCompleteFromAirOne').onclick = () => {
+      activeJob.fieldOps = 'Complete';
+      activeJob.status = 'Complete';
+      activeJob.missingFromAirOne = false;
+      triggerAutoSave();
+      openJob(activeJob);
+      showToast('Marked complete');
+    };
+    document.getElementById('deleteMissingJob').onclick = () => {
+      if (!confirm(`Delete job "${activeJob.name || 'Unnamed'} ${activeJob.number || ''}"?`)) return;
+      const index = jobs.indexOf(activeJob);
+      if (index > -1) {
+        jobs.splice(index, 1);
+        document.getElementById('detailPane').classList.remove('open');
+        renderAll();
+        triggerAutoSave();
+      }
     };
   }
   const notes = document.getElementById('notes');
@@ -1102,17 +1125,20 @@ function triggerFileInput() {
           return;
         }
         const headers = jsonData[0].map(h => (h || '').trim());
-        const existingNumbers = new Set(jobs.map(j => j.number).filter(Boolean));
+        const numKey = headers.find(h => /job\s*number/i.test(h)) || 'Job Number';
+        const existingNumbers = new Set(jobs.map(j => (j.number || '').trim()).filter(Boolean));
+        const seenInFile = new Set();
         const rows = jsonData.slice(1);
         rows.forEach(row => {
           const r = {};
           headers.forEach((h, i) => {
             r[h] = row[i] !== undefined ? String(row[i]).trim() : '';
           });
-          if (!r['Name'] && !r['Job Number']) return;
-          const jobNumber = r['Job Number'] || '';
+          const jobNumber = (r[numKey] || r['Job Number'] || '').trim();
+          if (!r['Name'] && !jobNumber) return;
+          if (jobNumber) seenInFile.add(jobNumber);
           if (jobNumber && existingNumbers.has(jobNumber)) {
-            const existing = jobs.find(j => j.number === jobNumber);
+            const existing = jobs.find(j => (j.number || '').trim() === jobNumber);
             if (existing) {
               if ((existing.fieldOps || existing.status || '') !== (r['Field Ops'] || '')) {
                 existing.statusWarning = true;
@@ -1172,10 +1198,21 @@ function triggerFileInput() {
           jobs.push(newJob);
           if (jobNumber) existingNumbers.add(jobNumber);
         });
+        let missingCount = 0;
+        jobs.forEach(j => {
+          const num = (j.number || '').trim();
+          if (!num) return;
+          if (seenInFile.has(num)) {
+            j.missingFromAirOne = false;
+          } else if (!isCompletedJob(j)) {
+            j.missingFromAirOne = true;
+            missingCount++;
+          }
+        });
         sortJobs('fieldOps');
         renderAll();
         triggerAutoSave();
-        alert('Imported successfully!');
+        alert(`Imported successfully!${missingCount ? ' ' + missingCount + ' job(s) not in Air One list.' : ''}`);
       } catch (err) {
         console.error('Import error:', err);
         alert('Import failed: ' + (err.message || 'Unknown error'));
@@ -1876,3 +1913,5 @@ renderAll();
 </script>
 </body>
 </html>
+
+
